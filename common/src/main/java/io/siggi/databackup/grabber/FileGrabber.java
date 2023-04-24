@@ -28,8 +28,10 @@ public class FileGrabber {
 
     public final File rootFile;
     public final DirectoryEntryDirectoryMemory rootDirectory;
-    public final List<String> ignoredItems;
-    public final List<String> failedItems;
+    public final List<String> ignoredItems = new LinkedList<>();
+    public final List<String> failedItems = new LinkedList<>();
+    private Predicate<String> pathChecker;
+    private boolean hasGrabbed = false;
     public long fileCount = 0L;
     public long unhashedFiles = 0L;
     public long totalFileSize = 0L;
@@ -37,30 +39,32 @@ public class FileGrabber {
     public long directoryCount = 0L;
     public long symlinkCount = 0L;
 
-    private FileGrabber(File rootFile, DirectoryEntryDirectoryMemory rootDirectory, List<String> ignoredItems, List<String> failedItems) {
+    public FileGrabber(File rootFile) {
         this.rootFile = rootFile;
-        this.rootDirectory = rootDirectory;
-        this.ignoredItems = ignoredItems;
-        this.failedItems = failedItems;
-    }
-
-    public static FileGrabber grabFiles(File rootDirectory, Predicate<String> pathChecker) throws InterruptedException {
-        DirectoryEntryDirectoryMemory rootDirectoryEntry = new DirectoryEntryDirectoryMemory("ROOT");
-        String absolutePath = rootDirectory.getAbsolutePath().replace(File.separatorChar, '/');
+        this.rootDirectory = new DirectoryEntryDirectoryMemory("ROOT");
+        String absolutePath = rootFile.getAbsolutePath().replace(File.separatorChar, '/');
         while (absolutePath.endsWith("/")) {
             absolutePath = absolutePath.substring(0, absolutePath.length() - 1);
         }
-        rootDirectoryEntry.getExtra().add(new ExtraDataFilePath(absolutePath));
-        List<String> ignoredItems = new LinkedList<>();
-        List<String> failedItems = new LinkedList<>();
-        FileGrabber fileGrabber = new FileGrabber(rootDirectory, rootDirectoryEntry, ignoredItems, failedItems);
-        grabFiles(rootDirectory, pathChecker, "", rootDirectoryEntry, fileGrabber, ignoredItems, failedItems);
-        return fileGrabber;
+        this.rootDirectory.getExtra().add(new ExtraDataFilePath(absolutePath));
     }
 
-    private static void grabFiles(File directory, Predicate<String> pathChecker,
-                                  String path, DirectoryEntryDirectoryMemory directoryEntry,
-                                  FileGrabber fileGrabber, List<String> ignoredItems, List<String> failedItems) throws InterruptedException {
+    public FileGrabber setPathPredicate(Predicate<String> pathPredicate) {
+        this.pathChecker = pathPredicate;
+        return this;
+    }
+
+    public FileGrabber grabFiles() throws InterruptedException {
+        if (hasGrabbed) {
+            throw new IllegalStateException("Already grabbed files!");
+        }
+        hasGrabbed = true;
+        grabFiles(rootFile, "", rootDirectory, ignoredItems, failedItems);
+        return this;
+    }
+
+    private void grabFiles(File directory, String path, DirectoryEntryDirectoryMemory directoryEntry,
+                                  List<String> ignoredItems, List<String> failedItems) throws InterruptedException {
         File[] files = directory.listFiles();
         if (files == null) return;
         Map<String, DirectoryEntry> entries = directoryEntry.getEntries();
@@ -83,7 +87,7 @@ public class FileGrabber {
                     symlinkEntry.setParent(directoryEntry);
                     addExtra(file, symlinkEntry);
                     entries.put(fileName, symlinkEntry);
-                    fileGrabber.symlinkCount += 1L;
+                    symlinkCount += 1L;
                 } catch (Exception e) {
                     failedItems.add(filePath);
                 }
@@ -93,17 +97,17 @@ public class FileGrabber {
                 addExtra(file, fileEntry);
                 //fileEntry.setFile(file);
                 entries.put(fileName, fileEntry);
-                fileGrabber.fileCount += 1L;
-                fileGrabber.unhashedFiles += 1L;
-                fileGrabber.totalFileSize += file.length();
-                fileGrabber.unhashedSize += file.length();
+                fileCount += 1L;
+                unhashedFiles += 1L;
+                totalFileSize += file.length();
+                unhashedSize += file.length();
             } else if (Files.isDirectory(filePathO, LinkOption.NOFOLLOW_LINKS)) {
                 DirectoryEntryDirectoryMemory subDirectory = new DirectoryEntryDirectoryMemory(fileName);
                 subDirectory.setParent(directoryEntry);
                 addExtra(file, subDirectory);
                 entries.put(fileName, subDirectory);
-                fileGrabber.directoryCount += 1L;
-                grabFiles(file, pathChecker, filePath + "/", subDirectory, fileGrabber, ignoredItems, failedItems);
+                directoryCount += 1L;
+                grabFiles(file, filePath + "/", subDirectory, ignoredItems, failedItems);
             }
         }
     }
