@@ -69,7 +69,7 @@ public class BackupFile implements Closeable {
         }
     }
 
-    public static void writeToFile(File file, DirectoryEntryDirectory rootDirectory, DirectoryEntryDirectory mergeIn) throws IOException {
+    public static void writeToFile(File file, DirectoryEntryDirectory rootDirectory) throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
             raf.setLength(0);
             raf.seek(0);
@@ -77,18 +77,17 @@ public class BackupFile implements Closeable {
             out.write(magicHeader);
             IO.writeInt(out, version);
 
-            DirectoryEntryDirectory metadata = mergeIn == null ? rootDirectory : mergeIn;
-            IO.writeString(out, metadata.getName());
+            IO.writeString(out, rootDirectory.getName());
             long locationOfOffset = raf.getFilePointer();
             IO.writeLong(out, 0L); // placeholder
-            Serialization.writeExtra(out, metadata.getExtra());
+            Serialization.writeExtra(out, rootDirectory.getExtra());
 
             long startOfDirectory = raf.getFilePointer();
             raf.seek(locationOfOffset);
             IO.writeLong(out, startOfDirectory);
             raf.seek(startOfDirectory);
 
-            Serialization.serializeDirectory(raf, rootDirectory, mergeIn);
+            Serialization.serializeDirectory(raf, rootDirectory);
         }
     }
 }

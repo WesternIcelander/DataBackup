@@ -3,7 +3,6 @@ package io.siggi.databackup.util;
 import io.siggi.databackup.data.DirectoryEntry;
 import io.siggi.databackup.data.DirectoryEntryDirectory;
 import io.siggi.databackup.data.DirectoryEntryDirectoryDisk;
-import io.siggi.databackup.data.DirectoryEntryDirectoryMemory;
 import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.DirectoryEntryNull;
 import io.siggi.databackup.data.DirectoryEntrySymlink;
@@ -12,8 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -22,38 +19,12 @@ public final class Serialization {
     private Serialization() {
     }
 
-    public static void serializeDirectory(RandomAccessFile out, DirectoryEntryDirectory directory, DirectoryEntryDirectory mergeIn) throws IOException {
-        serializeDirectory(out, new RafOutputStream(out), directory, mergeIn);
+    public static void serializeDirectory(RandomAccessFile out, DirectoryEntryDirectory directory) throws IOException {
+        serializeDirectory(out, new RafOutputStream(out), directory);
     }
 
-    private static void serializeDirectory(RandomAccessFile raf, RafOutputStream out, DirectoryEntryDirectory directory, DirectoryEntryDirectory mergeIn) throws IOException {
+    private static void serializeDirectory(RandomAccessFile raf, RafOutputStream out, DirectoryEntryDirectory directory) throws IOException {
         Map<String, DirectoryEntry> entries = directory.getEntries();
-        Map<String, DirectoryEntry> mergeEntries = null;
-        if (mergeIn != null) {
-            entries = directory instanceof DirectoryEntryDirectoryDisk ? entries : new HashMap<>(entries);
-            mergeEntries = mergeIn instanceof DirectoryEntryDirectoryDisk ? mergeIn.getEntries() : new HashMap<>(mergeIn.getEntries());
-            for (Iterator<Map.Entry<String,DirectoryEntry>> it = mergeEntries.entrySet().iterator(); it.hasNext();) {
-                Map.Entry<String,DirectoryEntry> entry = it.next();
-                String name = entry.getKey();
-                DirectoryEntry value = entry.getValue();
-                if (value.isNull()) {
-                    entries.remove(name);
-                } else if (value.isDirectory()) {
-                    DirectoryEntry directoryEntry = entries.get(name);
-                    if (directoryEntry == null) {
-                        entries.put(name, value);
-                        it.remove();
-                        continue;
-                    }
-                    DirectoryEntryDirectoryMemory mergeDirectory = new DirectoryEntryDirectoryMemory(name);
-                    mergeDirectory.getExtra().addAll(value.getExtra());
-                    mergeDirectory.getEntries().putAll(directoryEntry.asDirectory().getEntries());
-                    entries.put(name, mergeDirectory);
-                } else {
-                    entries.put(name, entry.getValue());
-                }
-            }
-        }
         List<String> names = Util.sortedKeys(entries);
         List<DirectoryInfo> directories = new LinkedList<>();
         for (String name : names) {
@@ -74,14 +45,7 @@ public final class Serialization {
                 IO.writeString(out, name);
                 long locationOfOffset = raf.getFilePointer();
                 IO.writeLong(out, 0L); // placeholder
-                DirectoryEntryDirectory mergeInDir = null;
-                if (mergeEntries != null) {
-                    DirectoryEntry possibleMergeInDir = mergeEntries.get(name);
-                    if (possibleMergeInDir != null && possibleMergeInDir.isDirectory()) {
-                        mergeInDir = possibleMergeInDir.asDirectory();
-                    }
-                }
-                directories.add(new DirectoryInfo(locationOfOffset, dir, mergeInDir));
+                directories.add(new DirectoryInfo(locationOfOffset, dir));
             } else if (entry instanceof DirectoryEntrySymlink symlink) {
                 out.write(3);
                 IO.writeString(out, name);
@@ -99,7 +63,7 @@ public final class Serialization {
             raf.seek(directoryInfo.locationOfOffset);
             IO.writeLong(out, filePointer);
             raf.seek(filePointer);
-            serializeDirectory(raf, out, directoryInfo.directory, directoryInfo.mergeIn);
+            serializeDirectory(raf, out, directoryInfo.directory);
         }
     }
 
@@ -145,6 +109,6 @@ public final class Serialization {
         IO.writeShort(out, 0);
     }
 
-    private record DirectoryInfo(long locationOfOffset, DirectoryEntryDirectory directory, DirectoryEntryDirectory mergeIn) {
+    private record DirectoryInfo(long locationOfOffset, DirectoryEntryDirectory directory) {
     }
 }
