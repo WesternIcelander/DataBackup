@@ -19,6 +19,7 @@ class ExtraDataTypes {
         registerType(ExtraDataFilePath.class, ExtraDataFilePath::deserialize);
         registerType(ExtraDataPosixPermissions.class, ExtraDataPosixPermissions::deserialize);
         registerType(ExtraDataNanosecondModifiedDate.class, ExtraDataNanosecondModifiedDate::deserialize);
+        registerType(ExtraDataDiffMetadata.class, ExtraDataDiffMetadata::deserialize);
     }
 
     record TypeRegistration(Class<? extends ExtraData> clazz, Function<byte[], ExtraData> deserializer) {
