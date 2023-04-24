@@ -31,19 +31,27 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
             int id;
             while ((id = in.read()) != -1) {
                 if (id == 255) break;
+                DirectoryEntry entry;
                 if (id == 0) {
                     String name = IO.readString(in);
-                    entries.put(name, new DirectoryEntryNull(name));
+                    entry = new DirectoryEntryNull(name);
+                    entries.put(name, entry);
                 } else if (id == 1) {
                     String name = IO.readString(in);
-                    entries.put(name, Serialization.deserializeFile(in, name));
+                    entry = Serialization.deserializeFile(in, name);
+                    entries.put(name, entry);
                 } else if (id == 2) {
                     String name = IO.readString(in);
-                    entries.put(name, Serialization.deserializeDirectory(in, data, name));
+                    entry = Serialization.deserializeDirectory(in, data, name);
+                    entries.put(name, entry);
                 } else if (id == 3) {
                     String name = IO.readString(in);
-                    entries.put(name, Serialization.deserializeSymlink(in, name));
+                    entry = Serialization.deserializeSymlink(in, name);
+                    entries.put(name, entry);
+                } else {
+                    throw new DirectoryEntryException("Unknown file type " + id);
                 }
+                entry.setParent(this);
             }
         } catch (Exception e) {
             throw new DirectoryEntryException("Unable to read directory", e);
