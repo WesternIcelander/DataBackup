@@ -38,8 +38,11 @@ public class DirectoryEntryDirectoryMerge extends DirectoryEntryDirectory {
                         entries.put(key, entry);
                         continue;
                     }
-                    entries.put(key, new DirectoryEntryDirectoryMerge(baseEntry.asDirectory(), entry.asDirectory()));
+                    DirectoryEntryDirectoryMerge subDirectory = new DirectoryEntryDirectoryMerge(baseEntry.asDirectory(), entry.asDirectory());
+                    subDirectory.setParent(this);
+                    entries.put(key, subDirectory);
                 } else {
+                    entry.setParent(this);
                     entries.put(key, entry);
                 }
             }
