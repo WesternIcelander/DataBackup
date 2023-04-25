@@ -1,4 +1,4 @@
-package io.siggi.databackup.grabber;
+package io.siggi.databackup.scanner;
 
 import io.siggi.databackup.data.DirectoryEntry;
 import io.siggi.databackup.data.DirectoryEntryDirectory;
@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public class FileGrabber {
+public class FileMetadataScanner {
 
     public final File rootFile;
     public final DirectoryEntryDirectoryMemory rootDirectory;
@@ -45,7 +45,7 @@ public class FileGrabber {
     public long directoryCount = 0L;
     public long symlinkCount = 0L;
 
-    public FileGrabber(File rootFile) {
+    public FileMetadataScanner(File rootFile) {
         this.rootFile = rootFile;
         this.rootDirectory = new DirectoryEntryDirectoryMemory("ROOT");
         String absolutePath = rootFile.getAbsolutePath().replace(File.separatorChar, '/');
@@ -55,18 +55,18 @@ public class FileGrabber {
         this.rootDirectory.getExtra().add(new ExtraDataFilePath(absolutePath));
     }
 
-    public FileGrabber setPathPredicate(Predicate<String> pathPredicate) {
+    public FileMetadataScanner setPathPredicate(Predicate<String> pathPredicate) {
         this.pathChecker = pathPredicate;
         return this;
     }
 
-    public FileGrabber createDiff(DirectoryEntryDirectory baseForDiff, Function<String, DiffAction> diffFunction) {
+    public FileMetadataScanner createDiff(DirectoryEntryDirectory baseForDiff, Function<String, DiffAction> diffFunction) {
         this.baseForDiff = baseForDiff;
         this.diffFunction = diffFunction;
         return this;
     }
 
-    public FileGrabber grabFiles() throws InterruptedException {
+    public FileMetadataScanner grabFiles() throws InterruptedException {
         if (hasGrabbed) {
             throw new IllegalStateException("Already grabbed files!");
         }

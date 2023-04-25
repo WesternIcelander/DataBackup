@@ -1,4 +1,4 @@
-package io.siggi.databackup.grabber;
+package io.siggi.databackup.scanner;
 
 public enum DiffAction {
     /**
