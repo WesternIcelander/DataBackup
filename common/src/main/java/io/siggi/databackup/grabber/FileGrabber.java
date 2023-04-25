@@ -124,7 +124,7 @@ public class FileGrabber {
                 DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, new byte[32], file.lastModified(), file.length());
                 fileEntry.setParent(directoryEntry);
                 addExtra(file, fileEntry);
-                if (fileEntry.equals(baseEntry)) {
+                if (baseEntry instanceof DirectoryEntryFile baseFile && fileEntry.equalsIgnoreHash(baseFile)) {
                     skippedEntries.add(fileName);
                     continue;
                 }

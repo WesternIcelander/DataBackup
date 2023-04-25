@@ -59,6 +59,11 @@ public class DirectoryEntryFile extends DirectoryEntry {
         return Arrays.equals(sha256, o.sha256) && lastModified == o.lastModified && size == o.size;
     }
 
+    public boolean equalsIgnoreHash(DirectoryEntryFile other) {
+        if (!super.equals(other)) return false;
+        return lastModified == other.lastModified && size == other.size;
+    }
+
     @Override
     public int hashCode() {
         int result = Objects.hash(super.hashCode(), lastModified, size);
