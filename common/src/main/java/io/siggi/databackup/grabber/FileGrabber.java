@@ -168,11 +168,14 @@ public class FileGrabber {
         }
     }
 
-    public void copyHashes(DirectoryEntryDirectory root) {
+    public void copyHashes(DirectoryEntryDirectory root) throws InterruptedException {
         copyHashes(root, rootDirectory);
     }
 
-    private void copyHashes(DirectoryEntryDirectory from, DirectoryEntryDirectoryMemory to) {
+    private void copyHashes(DirectoryEntryDirectory from, DirectoryEntryDirectoryMemory to) throws InterruptedException {
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
         Map<String, DirectoryEntry> fromEntries = from.getEntries();
         for (Map.Entry<String, DirectoryEntry> entry : to.getEntries().entrySet()) {
             String name = entry.getKey();
