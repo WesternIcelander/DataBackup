@@ -21,6 +21,8 @@ class ExtraDataTypes {
         registerType(ExtraDataNanosecondModifiedDate.class, ExtraDataNanosecondModifiedDate::deserialize);
         registerType(ExtraDataDiffMetadata.class, ExtraDataDiffMetadata::deserialize);
         registerType(ExtraDataMacOSFSEvents.class, ExtraDataMacOSFSEvents::deserialize);
+        registerType(ExtraDataSnapshotInfoApfs.class, ExtraDataSnapshotInfoApfs::deserialize);
+        registerType(ExtraDataSnapshotInfoBtrfs.class, ExtraDataSnapshotInfoBtrfs::deserialize);
     }
 
     record TypeRegistration(Class<? extends ExtraData> clazz, Function<byte[], ExtraData> deserializer) {
