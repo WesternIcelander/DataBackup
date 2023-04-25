@@ -20,6 +20,7 @@ class ExtraDataTypes {
         registerType(ExtraDataPosixPermissions.class, ExtraDataPosixPermissions::deserialize);
         registerType(ExtraDataNanosecondModifiedDate.class, ExtraDataNanosecondModifiedDate::deserialize);
         registerType(ExtraDataDiffMetadata.class, ExtraDataDiffMetadata::deserialize);
+        registerType(ExtraDataMacOSFSEvents.class, ExtraDataMacOSFSEvents::deserialize);
     }
 
     record TypeRegistration(Class<? extends ExtraData> clazz, Function<byte[], ExtraData> deserializer) {
