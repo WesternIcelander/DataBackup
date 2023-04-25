@@ -95,7 +95,6 @@ public class FileGrabber {
                 DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, new byte[32], file.lastModified(), file.length());
                 fileEntry.setParent(directoryEntry);
                 addExtra(file, fileEntry);
-                //fileEntry.setFile(file);
                 entries.put(fileName, fileEntry);
                 fileCount += 1L;
                 unhashedFiles += 1L;
