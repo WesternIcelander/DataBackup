@@ -124,7 +124,7 @@ public class MacOSUtility {
 
     public static void deleteSnapshots(String date, List<MountedDisk> allDisks, MountedDisk exceptDisk) {
         for (MountedDisk disk : allDisks) {
-            if (disk == exceptDisk) continue;
+            if (disk.equals(exceptDisk)) continue;
             List<ApfsSnapshot> apfsSnapshots = listSnapshots(disk.dev());
             apfsSnapshots.forEach(snapshot -> {
                 if (!snapshot.name().contains(date)) return;
