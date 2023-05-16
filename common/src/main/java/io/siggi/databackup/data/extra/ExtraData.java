@@ -2,7 +2,7 @@ package io.siggi.databackup.data.extra;
 
 public abstract class ExtraData {
 
-    public final int getTypeId() {
+    public int getTypeId() {
         return ExtraDataTypes.dataTypesReverseLookup.get(getClass());
     }
 
