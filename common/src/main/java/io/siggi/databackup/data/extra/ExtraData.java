@@ -11,6 +11,9 @@ public abstract class ExtraData {
     public static ExtraData deserialize(int typeId, byte[] data) {
         try {
             ExtraDataTypes.TypeRegistration typeRegistration = ExtraDataTypes.dataTypes.get(typeId - 1);
+            if (typeRegistration == null) {
+                return new ExtraDataUnsupported(typeId, data);
+            }
             return typeRegistration.deserializer().apply(data);
         } catch (Exception e) {
         }
