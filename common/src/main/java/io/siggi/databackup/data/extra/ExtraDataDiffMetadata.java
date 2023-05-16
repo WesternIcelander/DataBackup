@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Objects;
 
-public class ExtraDataDiffMetadata extends ExtraData {
+public final class ExtraDataDiffMetadata extends ExtraData {
 
     public ExtraDataDiffMetadata(String baseName, String baseHash) {
         this.baseName = baseName;

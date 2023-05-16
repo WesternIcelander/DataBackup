@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
 
-public class ExtraDataMacOSFSEvents extends ExtraData {
+public final class ExtraDataMacOSFSEvents extends ExtraData {
 
     public ExtraDataMacOSFSEvents(long lastEventId, UUID fsEventsUuid) {
         if (fsEventsUuid == null) throw new NullPointerException();

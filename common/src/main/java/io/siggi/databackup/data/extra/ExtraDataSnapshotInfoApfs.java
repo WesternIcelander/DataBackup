@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Objects;
 
-public class ExtraDataSnapshotInfoApfs extends ExtraData {
+public final class ExtraDataSnapshotInfoApfs extends ExtraData {
 
     public ExtraDataSnapshotInfoApfs(String name, long xid) {
         if (name == null) throw new NullPointerException();

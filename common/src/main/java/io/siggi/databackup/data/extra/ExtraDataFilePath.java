@@ -2,7 +2,7 @@ package io.siggi.databackup.data.extra;
 
 import java.nio.charset.StandardCharsets;
 
-public class ExtraDataFilePath extends ExtraData {
+public final class ExtraDataFilePath extends ExtraData {
 
     public ExtraDataFilePath(String path) {
         if (path == null) throw new NullPointerException();

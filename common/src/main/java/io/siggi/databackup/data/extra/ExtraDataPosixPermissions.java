@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Objects;
 
-public class ExtraDataPosixPermissions extends ExtraData {
+public final class ExtraDataPosixPermissions extends ExtraData {
 
     public ExtraDataPosixPermissions(int permissions, long owner, long group) {
         this.permissions = permissions;

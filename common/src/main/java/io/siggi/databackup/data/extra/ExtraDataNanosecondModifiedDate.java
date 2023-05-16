@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Objects;
 
-public class ExtraDataNanosecondModifiedDate extends ExtraData {
+public final class ExtraDataNanosecondModifiedDate extends ExtraData {
 
     public ExtraDataNanosecondModifiedDate(long seconds, int nanos) {
         this.seconds = seconds;

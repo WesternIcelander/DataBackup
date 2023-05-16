@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Objects;
 
-public class ExtraDataSnapshotInfoBtrfs extends ExtraData {
+public final class ExtraDataSnapshotInfoBtrfs extends ExtraData {
 
     public ExtraDataSnapshotInfoBtrfs(String path) {
         if (path == null) throw new NullPointerException();
