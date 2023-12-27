@@ -30,21 +30,21 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
             InputStream in = new BufferedInputStream(data.getInputStream(offset));
             int id;
             while ((id = in.read()) != -1) {
-                if (id == 255) break;
+                if (id == Serialization.DIRECTORY_ENTRY_END) break;
                 DirectoryEntry entry;
-                if (id == 0) {
+                if (id == Serialization.DIRECTORY_ENTRY_NULL) {
                     String name = IO.readString(in);
                     entry = new DirectoryEntryNull(name);
                     entries.put(name, entry);
-                } else if (id == 1) {
+                } else if (id == Serialization.DIRECTORY_ENTRY_FILE) {
                     String name = IO.readString(in);
                     entry = Serialization.deserializeFile(in, name);
                     entries.put(name, entry);
-                } else if (id == 2) {
+                } else if (id == Serialization.DIRECTORY_ENTRY_DIRECTORY) {
                     String name = IO.readString(in);
                     entry = Serialization.deserializeDirectory(in, data, name);
                     entries.put(name, entry);
-                } else if (id == 3) {
+                } else if (id == Serialization.DIRECTORY_ENTRY_SYMLINK) {
                     String name = IO.readString(in);
                     entry = Serialization.deserializeSymlink(in, name);
                     entries.put(name, entry);

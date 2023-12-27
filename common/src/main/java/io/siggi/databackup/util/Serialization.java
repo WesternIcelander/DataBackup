@@ -16,6 +16,13 @@ import java.util.List;
 import java.util.Map;
 
 public final class Serialization {
+
+    public static final int DIRECTORY_ENTRY_NULL = 0;
+    public static final int DIRECTORY_ENTRY_FILE = 1;
+    public static final int DIRECTORY_ENTRY_DIRECTORY = 2;
+    public static final int DIRECTORY_ENTRY_SYMLINK = 3;
+    public static final int DIRECTORY_ENTRY_END = 255;
+
     private Serialization() {
     }
 
@@ -31,23 +38,23 @@ public final class Serialization {
             DirectoryEntry entry = entries.get(name);
             boolean skipExtra = false;
             if (entry instanceof DirectoryEntryNull) {
-                out.write(0);
+                out.write(DIRECTORY_ENTRY_NULL);
                 IO.writeString(out, name);
                 skipExtra = true;
             } else if (entry instanceof DirectoryEntryFile file) {
-                out.write(1);
+                out.write(DIRECTORY_ENTRY_FILE);
                 IO.writeString(out, name);
                 out.write(file.getSha256());
                 IO.writeLong(out, file.getLastModified());
                 IO.writeLong(out, file.getSize());
             } else if (entry instanceof DirectoryEntryDirectory dir) {
-                out.write(2);
+                out.write(DIRECTORY_ENTRY_DIRECTORY);
                 IO.writeString(out, name);
                 long locationOfOffset = raf.getFilePointer();
                 IO.writeLong(out, 0L); // placeholder
                 directories.add(new DirectoryInfo(locationOfOffset, dir));
             } else if (entry instanceof DirectoryEntrySymlink symlink) {
-                out.write(3);
+                out.write(DIRECTORY_ENTRY_SYMLINK);
                 IO.writeString(out, name);
                 IO.writeString(out, symlink.getTarget());
             } else {
@@ -57,7 +64,7 @@ public final class Serialization {
                 writeExtra(out, entry.getExtra());
             }
         }
-        out.write(255);
+        out.write(DIRECTORY_ENTRY_END);
         for (DirectoryInfo directoryInfo : directories) {
             long filePointer = raf.getFilePointer();
             raf.seek(directoryInfo.locationOfOffset);
