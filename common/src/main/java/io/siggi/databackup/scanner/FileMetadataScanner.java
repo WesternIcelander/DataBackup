@@ -81,16 +81,16 @@ public class FileMetadataScanner {
     private void grabFiles(File directory, String path, DirectoryEntryDirectoryMemory directoryEntry,
                            DirectoryEntryDirectory baseForDiff, DiffAction diffAction,
                            List<String> ignoredItems, List<String> failedItems) throws InterruptedException {
-        File[] files = directory.listFiles();
+        String[] files = directory.list();
         if (files == null) return;
         Map<String, DirectoryEntry> entries = directoryEntry.getEntries();
         Map<String, DirectoryEntry> baseEntries = baseForDiff == null ? null : baseForDiff.getEntries();
         Set<String> skippedEntries = new HashSet<>();
-        for (File file : files) {
+        for (String fileName : files) {
             if (Thread.interrupted()) {
                 throw new InterruptedException();
             }
-            String fileName = file.getName();
+            File file = new File(directory, fileName);
             String filePath = path + fileName;
             DirectoryEntry baseEntry = baseEntries == null ? null : baseEntries.get(fileName);
             File noBackup = new File(file, ".nobackup");
