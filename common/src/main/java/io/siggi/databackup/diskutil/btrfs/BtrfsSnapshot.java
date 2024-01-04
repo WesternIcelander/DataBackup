@@ -9,10 +9,10 @@ import java.io.File;
 
 public class BtrfsSnapshot implements Snapshot {
 
-    private final String mountedPath;
+    private final String path;
 
-    public BtrfsSnapshot(String mountedPath) {
-        this.mountedPath = mountedPath;
+    public BtrfsSnapshot(String path) {
+        this.path = path;
     }
 
     @Override
@@ -20,9 +20,13 @@ public class BtrfsSnapshot implements Snapshot {
         return BtrfsDiskUtil.get();
     }
 
+    public String path() {
+        return path;
+    }
+
     @Override
     public String mountedPath() throws SnapshotException {
-        return mountedPath;
+        return path;
     }
 
     @Override
@@ -46,7 +50,7 @@ public class BtrfsSnapshot implements Snapshot {
                     BtrfsDiskUtil.BTRFS_PATH,
                     "subvolume",
                     "delete",
-                    mountedPath
+                    path
             });
             if (process.waitFor() != 0) throw new SnapshotException(Util.getErrorString(process));
         } catch (Exception e) {
