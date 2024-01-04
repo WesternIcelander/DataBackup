@@ -2,6 +2,7 @@ package io.siggi.databackup.diskutil.btrfs;
 
 import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.SnapshotException;
+import io.siggi.databackup.diskutil.apfs.ApfsSnapshotSerializer;
 import io.siggi.databackup.util.Util;
 
 import java.util.ArrayList;
@@ -27,6 +28,11 @@ public class BtrfsDiskUtil implements DiskUtil<BtrfsSnapshot> {
     @Override
     public String filesystem() {
         return "btrfs";
+    }
+
+    @Override
+    public BtrfsSnapshotSerializer serializer() {
+        return BtrfsSnapshotSerializer.get();
     }
 
     @Override

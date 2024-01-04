@@ -34,6 +34,11 @@ public class ApfsDiskUtil implements DiskUtil<ApfsSnapshot> {
     }
 
     @Override
+    public ApfsSnapshotSerializer serializer() {
+        return ApfsSnapshotSerializer.get();
+    }
+
+    @Override
     public boolean supportsSnapshots() {
         return true;
     }

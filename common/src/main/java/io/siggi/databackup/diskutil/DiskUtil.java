@@ -6,6 +6,7 @@ import java.util.function.Function;
 
 public interface DiskUtil<S extends Snapshot> {
     String filesystem();
+    SnapshotSerializer<S> serializer();
     boolean supportsSnapshots();
     boolean snapshotsRequireDestination();
     Map<String,S> createSnapshots(Collection<String> filesystems, Function<String,String> destination) throws SnapshotException;

@@ -2,6 +2,7 @@ package io.siggi.databackup.diskutil.ntfs;
 
 import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.SnapshotException;
+import io.siggi.databackup.diskutil.btrfs.BtrfsSnapshotSerializer;
 import io.siggi.databackup.util.Util;
 
 import java.io.BufferedReader;
@@ -35,6 +36,11 @@ public class NtfsDiskUtil implements DiskUtil<NtfsSnapshot> {
     @Override
     public String filesystem() {
         return "ntfs";
+    }
+
+    @Override
+    public NtfsSnapshotSerializer serializer() {
+        return NtfsSnapshotSerializer.get();
     }
 
     @Override
