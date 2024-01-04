@@ -15,6 +15,20 @@ public class BtrfsDiskUtil implements DiskUtil<BtrfsSnapshot> {
 
     static final String BTRFS_PATH = "/usr/bin/btrfs";
 
+    private BtrfsDiskUtil() {
+    }
+
+    private static final BtrfsDiskUtil instance = new BtrfsDiskUtil();
+
+    public static BtrfsDiskUtil get() {
+        return instance;
+    }
+
+    @Override
+    public String filesystem() {
+        return "btrfs";
+    }
+
     @Override
     public boolean supportsSnapshots() {
         return true;

@@ -23,6 +23,20 @@ public class NtfsDiskUtil implements DiskUtil<NtfsSnapshot> {
     static final String WMIC_PATH = "C:\\Windows\\System32\\wbem\\WMIC.exe";
     static final String VSSADMIN_PATH = "C:\\Windows\\System32\\vssadmin.exe";
 
+    private NtfsDiskUtil() {
+    }
+
+    private static final NtfsDiskUtil instance = new NtfsDiskUtil();
+
+    public static NtfsDiskUtil get() {
+        return instance;
+    }
+
+    @Override
+    public String filesystem() {
+        return "ntfs";
+    }
+
     @Override
     public boolean supportsSnapshots() {
         return true;

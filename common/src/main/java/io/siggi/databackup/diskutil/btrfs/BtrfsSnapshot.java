@@ -1,5 +1,6 @@
 package io.siggi.databackup.diskutil.btrfs;
 
+import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.util.Util;
@@ -12,6 +13,11 @@ public class BtrfsSnapshot implements Snapshot {
 
     public BtrfsSnapshot(String mountedPath) {
         this.mountedPath = mountedPath;
+    }
+
+    @Override
+    public DiskUtil<?> diskUtil() {
+        return BtrfsDiskUtil.get();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package io.siggi.databackup.diskutil.apfs;
 
+import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.diskutil.MountedDisk;
@@ -44,6 +45,11 @@ public class ApfsSnapshot implements Snapshot {
 
     public long xid() {
         return xid;
+    }
+
+    @Override
+    public DiskUtil<?> diskUtil() {
+        return ApfsDiskUtil.get();
     }
 
     @Override

@@ -19,6 +19,20 @@ import java.util.regex.Pattern;
 
 public class ApfsDiskUtil implements DiskUtil<ApfsSnapshot> {
 
+    private ApfsDiskUtil() {
+    }
+
+    private static final ApfsDiskUtil instance = new ApfsDiskUtil();
+
+    public static ApfsDiskUtil get() {
+        return instance;
+    }
+
+    @Override
+    public String filesystem() {
+        return "apfs";
+    }
+
     @Override
     public boolean supportsSnapshots() {
         return true;

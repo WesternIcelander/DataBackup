@@ -1,5 +1,6 @@
 package io.siggi.databackup.diskutil.ntfs;
 
+import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.util.Util;
@@ -24,6 +25,11 @@ public class NtfsSnapshot implements Snapshot {
 
     public UUID shadowCopyId() {
         return shadowCopyId;
+    }
+
+    @Override
+    public DiskUtil<?> diskUtil() {
+        return NtfsDiskUtil.get();
     }
 
     @Override

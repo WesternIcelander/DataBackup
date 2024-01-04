@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 public interface DiskUtil<S extends Snapshot> {
+    String filesystem();
     boolean supportsSnapshots();
     boolean snapshotsRequireDestination();
     Map<String,S> createSnapshots(Collection<String> filesystems, Function<String,String> destination) throws SnapshotException;
