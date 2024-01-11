@@ -3,6 +3,7 @@ package io.siggi.databackup.util;
 import io.siggi.databackup.data.DirectoryEntry;
 import io.siggi.databackup.data.DirectoryEntryDirectory;
 import io.siggi.databackup.data.DirectoryEntryFile;
+import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
 import java.io.PrintStream;
 import java.util.List;
@@ -28,8 +29,15 @@ public class DirectoryPrinter {
                 stream.println(prefix + name + " -> " + entry.asSymlink().getTarget());
             } else if (entry.isFile()) {
                 DirectoryEntryFile file = entry.asFile();
-                byte[] sha256 = file.getSha256();
-                String hash = Util.isZero(sha256) ? "unhashed" : Util.bytesToHex(sha256);
+                String hash;
+                List<FileContent> fileContents = file.getFileContents();
+                if (fileContents.isEmpty()) {
+                    hash = "unhashed";
+                } else if (fileContents.size() == 1) {
+                    hash = fileContents.get(0).toString();
+                } else {
+                    hash = "multipart content";
+                }
                 stream.println(prefix + name + " (" + hash + ", " + file.getSize() + ")" + getSuffix(file));
             } else if (entry.isDirectory()) {
                 DirectoryEntryDirectory dir = entry.asDirectory();

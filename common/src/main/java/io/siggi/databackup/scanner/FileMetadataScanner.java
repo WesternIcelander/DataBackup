@@ -6,6 +6,7 @@ import io.siggi.databackup.data.DirectoryEntryDirectoryMemory;
 import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.DirectoryEntryNull;
 import io.siggi.databackup.data.DirectoryEntrySymlink;
+import io.siggi.databackup.data.content.Sha256FileContent;
 import io.siggi.databackup.data.extra.ExtraDataFilePath;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
@@ -121,7 +122,7 @@ public class FileMetadataScanner {
                 if (diffAction == DiffAction.SUBDIRS_ONLY) {
                     continue;
                 }
-                DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, new byte[32], file.lastModified(), file.length());
+                DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, file.lastModified(), file.length());
                 fileEntry.setParent(directoryEntry);
                 addExtra(file, fileEntry);
                 if (baseEntry instanceof DirectoryEntryFile baseFile && fileEntry.equalsIgnoreHash(baseFile)) {
@@ -190,12 +191,12 @@ public class FileMetadataScanner {
                 DirectoryEntryFile fromFile = fromValue.asFile();
                 DirectoryEntryFile toFile = toValue.asFile();
                 if (fromFile.getSize() != toFile.getSize() || !fromFile.hasSameLastModified(toFile)) continue;
-                if (!Util.isZero(fromFile.getSha256())) {
-                    if (Util.isZero(toFile.getSha256())) {
+                if (!fromFile.getFileContents().isEmpty()) {
+                    if (toFile.getFileContents().isEmpty()) {
                         unhashedSize -= toFile.getSize();
                         unhashedFiles -= 1;
                     }
-                    System.arraycopy(fromFile.getSha256(), 0, toFile.getSha256(), 0, 32);
+                    toFile.getFileContents().addAll(fromFile.getFileContents());
                 }
             }
         }
@@ -212,7 +213,7 @@ public class FileMetadataScanner {
             DirectoryEntry entry = entries.get(name);
             if (entry.isFile()) {
                 DirectoryEntryFile file = entry.asFile();
-                if (!Util.isZero(file.getSha256())) {
+                if (!file.getFileContents().isEmpty()) {
                     continue;
                 }
                 String filePath = path + name;
@@ -224,7 +225,11 @@ public class FileMetadataScanner {
                     MessageDigestOutputStream out = new MessageDigestOutputStream(sha256);
                     IO.copyInterruptible(in, out, (progress) -> unhashedSize -= progress);
                     byte[] digest = sha256.digest();
-                    System.arraycopy(digest, 0, file.getSha256(), 0, 32);
+                    Sha256FileContent fileContent = new Sha256FileContent();
+                    fileContent.setOffset(0L);
+                    fileContent.setLength(file.getSize());
+                    System.arraycopy(digest, 0, fileContent.getHash(), 0, 32);
+                    file.getFileContents().add(fileContent);
                     failed = false;
                 } catch (InterruptedException e) {
                     throw e;

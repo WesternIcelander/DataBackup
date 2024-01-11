@@ -1,26 +1,67 @@
 package io.siggi.databackup.data;
 
+import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
-import java.util.Arrays;
+import io.siggi.databackup.util.RandomAccessData;
+import io.siggi.databackup.util.Serialization;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class DirectoryEntryFile extends DirectoryEntry {
-    private final byte[] sha256;
+    private List<FileContent> fileContents;
+    private Reference<List<FileContent>> fileContentsReference;
+    private final long contentOffset;
+    private final RandomAccessData data;
     private final long lastModified;
     private final long size;
 
-    public DirectoryEntryFile(String name, byte[] sha256, long lastModified, long size) {
+    public DirectoryEntryFile(String name, long lastModified, long size) {
+        this(name, new ArrayList<>(), 0L, null, lastModified, size);
+    }
+
+    public DirectoryEntryFile(String name, List<FileContent> fileContents, long contentOffset, RandomAccessData data, long lastModified, long size) {
         super(name);
-        if (sha256.length != 32) {
-            throw new IllegalArgumentException("sha256 must be exactly 32 bytes");
-        }
-        this.sha256 = sha256;
+        this.fileContents = fileContents;
+        this.contentOffset = contentOffset;
+        this.data = data;
         this.lastModified = lastModified;
         this.size = size;
     }
 
-    public final byte[] getSha256() {
-        return sha256;
+    public final List<FileContent> getFileContents() {
+        if (fileContents == null) {
+            List<FileContent> weakContents = fileContentsReference == null ? null : fileContentsReference.get();
+            if (weakContents == null) {
+                weakContents = readFileContents();
+                if (weakContents != null) {
+                    fileContentsReference = new WeakReference<>(weakContents);
+                }
+            }
+            return weakContents;
+        }
+        return fileContents;
+    }
+
+    public final List<FileContent> getFileContents(boolean keepInMemory) {
+        if (fileContents != null) return fileContents;
+        if (keepInMemory) {
+            return fileContents = getFileContents();
+        } else {
+            return getFileContents();
+        }
+    }
+
+    private List<FileContent> readFileContents() {
+        try (InputStream in = data.getInputStream(contentOffset)) {
+            return Serialization.deserializeFileContents(in);
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     public final long getLastModified() {
@@ -56,7 +97,7 @@ public class DirectoryEntryFile extends DirectoryEntry {
     public boolean equals(Object other) {
         if (!super.equals(other)) return false;
         if (!(other instanceof DirectoryEntryFile o)) return false;
-        return Arrays.equals(sha256, o.sha256) && lastModified == o.lastModified && size == o.size;
+        return Objects.equals(getFileContents(), o.getFileContents()) && lastModified == o.lastModified && size == o.size;
     }
 
     public boolean equalsIgnoreHash(DirectoryEntryFile other) {
@@ -66,8 +107,6 @@ public class DirectoryEntryFile extends DirectoryEntry {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(super.hashCode(), lastModified, size);
-        result = 31 * result + Arrays.hashCode(sha256);
-        return result;
+        return Objects.hash(super.hashCode(), getFileContents(), lastModified, size);
     }
 }

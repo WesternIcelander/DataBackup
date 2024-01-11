@@ -6,11 +6,13 @@ import io.siggi.databackup.data.DirectoryEntryDirectoryDisk;
 import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.DirectoryEntryNull;
 import io.siggi.databackup.data.DirectoryEntrySymlink;
+import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraData;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ public final class Serialization {
     private static void serializeDirectory(RandomAccessFile raf, RafOutputStream out, DirectoryEntryDirectory directory) throws IOException {
         Map<String, DirectoryEntry> entries = directory.getEntries();
         List<String> names = Util.sortedKeys(entries);
+        List<FileInfo> files = new LinkedList<>();
         List<DirectoryInfo> directories = new LinkedList<>();
         for (String name : names) {
             DirectoryEntry entry = entries.get(name);
@@ -44,7 +47,16 @@ public final class Serialization {
             } else if (entry instanceof DirectoryEntryFile file) {
                 out.write(DIRECTORY_ENTRY_FILE);
                 IO.writeString(out, name);
-                out.write(file.getSha256());
+                List<FileContent> fileContents = file.getFileContents();
+                if (fileContents.size() <= 1) {
+                    out.write(0);
+                    serializeFileContents(out, fileContents);
+                } else {
+                    out.write(1);
+                    long locationOfOffset = raf.getFilePointer();
+                    IO.writeLong(out, 0L); // placeholder
+                    files.add(new FileInfo(locationOfOffset, file));
+                }
                 IO.writeLong(out, file.getLastModified());
                 IO.writeLong(out, file.getSize());
             } else if (entry instanceof DirectoryEntryDirectory dir) {
@@ -65,6 +77,13 @@ public final class Serialization {
             }
         }
         out.write(DIRECTORY_ENTRY_END);
+        for (FileInfo fileInfo : files) {
+            long filePointer = raf.getFilePointer();
+            raf.seek(fileInfo.locationOfOffset);
+            IO.writeLong(out, filePointer);
+            raf.seek(filePointer);
+            serializeFileContents(out, fileInfo.file.getFileContents());
+        }
         for (DirectoryInfo directoryInfo : directories) {
             long filePointer = raf.getFilePointer();
             raf.seek(directoryInfo.locationOfOffset);
@@ -74,11 +93,20 @@ public final class Serialization {
         }
     }
 
-    public static DirectoryEntryFile deserializeFile(InputStream in, String name) throws IOException {
-        byte[] sha256 = IO.readBytes(in, 32);
+    public static DirectoryEntryFile deserializeFile(InputStream in, RandomAccessData data, String name) throws IOException {
+        List<FileContent> fileContents = null;
+        long contentOffset = -1L;
+        switch (IO.readByte(in)) {
+            case 0:
+                fileContents = deserializeFileContents(in);
+                break;
+            case 1:
+                contentOffset = IO.readLong(in);
+                break;
+        }
         long lastModified = IO.readLong(in);
         long size = IO.readLong(in);
-        return readExtraAndReturn(in, new DirectoryEntryFile(name, sha256, lastModified, size));
+        return readExtraAndReturn(in, new DirectoryEntryFile(name, fileContents, contentOffset, data, lastModified, size));
     }
 
     public static DirectoryEntryDirectoryDisk deserializeDirectory(InputStream in, RandomAccessData data, String name) throws IOException {
@@ -116,6 +144,29 @@ public final class Serialization {
         IO.writeShort(out, 0);
     }
 
+    public static void serializeFileContents(OutputStream out, List<FileContent> fileContents) throws IOException {
+        IO.writeInt(out, fileContents.size());
+        for (FileContent content : fileContents) {
+            IO.writeShort(out, content.getTypeId());
+            content.write(out);
+        }
+    }
+
+    public static List<FileContent> deserializeFileContents(InputStream in) throws IOException {
+        int count = IO.readInt(in);
+        List<FileContent> contents = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            int typeId = IO.readShort(in);
+            FileContent content = FileContent.create(typeId);
+            content.read(in);
+            contents.add(content);
+        }
+        return contents;
+    }
+
     private record DirectoryInfo(long locationOfOffset, DirectoryEntryDirectory directory) {
+    }
+
+    private record FileInfo(long locationOfOffset, DirectoryEntryFile file) {
     }
 }

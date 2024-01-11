@@ -38,7 +38,7 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
                     entries.put(name, entry);
                 } else if (id == Serialization.DIRECTORY_ENTRY_FILE) {
                     String name = IO.readString(in);
-                    entry = Serialization.deserializeFile(in, name);
+                    entry = Serialization.deserializeFile(in, data, name);
                     entries.put(name, entry);
                 } else if (id == Serialization.DIRECTORY_ENTRY_DIRECTORY) {
                     String name = IO.readString(in);
