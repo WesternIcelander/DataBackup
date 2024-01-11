@@ -11,14 +11,14 @@ public final class IO {
     private IO() {
     }
 
-    private static int readEOF(InputStream in) throws IOException {
+    public static int readByte(InputStream in) throws IOException {
         int read = in.read();
         if (read == -1) throw new EOFException();
         return read;
     }
 
     public static int readShort(InputStream in) throws IOException {
-        return (readEOF(in) << 8) | readEOF(in);
+        return (readByte(in) << 8) | readByte(in);
     }
 
     public static void writeShort(OutputStream out, int value) throws IOException {
@@ -27,7 +27,7 @@ public final class IO {
     }
 
     public static int readInt(InputStream in) throws IOException {
-        return (readEOF(in) << 24) | (readEOF(in) << 16) | (readEOF(in) << 8) | readEOF(in);
+        return (readByte(in) << 24) | (readByte(in) << 16) | (readByte(in) << 8) | readByte(in);
     }
 
     public static void writeInt(OutputStream out, int value) throws IOException {
@@ -38,8 +38,8 @@ public final class IO {
     }
 
     public static long readLong(InputStream in) throws IOException {
-        return (((long) readEOF(in)) << 56) | (((long) readEOF(in)) << 48) | (((long) readEOF(in)) << 40) | (((long) readEOF(in)) << 32)
-            | (((long) readEOF(in)) << 24) | (((long) readEOF(in)) << 16) | (((long) readEOF(in)) << 8) | ((long) readEOF(in));
+        return (((long) readByte(in)) << 56) | (((long) readByte(in)) << 48) | (((long) readByte(in)) << 40) | (((long) readByte(in)) << 32)
+            | (((long) readByte(in)) << 24) | (((long) readByte(in)) << 16) | (((long) readByte(in)) << 8) | ((long) readByte(in));
     }
 
     public static void writeLong(OutputStream out, long value) throws IOException {
