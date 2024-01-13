@@ -2,6 +2,7 @@ package io.siggi.databackup.util.pathhack;
 
 import io.siggi.reflectionfreedom.ReflectionFreedom;
 
+import java.io.File;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
@@ -107,7 +108,8 @@ public class WindowsPathHack extends PathHack {
 
             @Override
             public Path next() {
-                String name = originalIterator.next().getFileName().toString();
+                String name = originalIterator.next().toString();
+                name = name.substring(name.lastIndexOf(File.separator) + 1);
                 return createPath(originalPrefix + name);
             }
         };
