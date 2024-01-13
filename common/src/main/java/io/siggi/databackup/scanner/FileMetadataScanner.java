@@ -13,9 +13,13 @@ import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
 import io.siggi.databackup.util.IO;
 import io.siggi.databackup.util.MessageDigestOutputStream;
 import io.siggi.databackup.util.Util;
+import io.siggi.databackup.util.pathhack.PathHack;
 import io.siggi.stat.Stat;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -82,72 +86,75 @@ public class FileMetadataScanner {
     private void grabFiles(File directory, String path, DirectoryEntryDirectoryMemory directoryEntry,
                            DirectoryEntryDirectory baseForDiff, DiffAction diffAction,
                            List<String> ignoredItems, List<String> failedItems) throws InterruptedException {
-        String[] files = directory.list();
-        if (files == null) return;
         Map<String, DirectoryEntry> entries = directoryEntry.getEntries();
         Map<String, DirectoryEntry> baseEntries = baseForDiff == null ? null : baseForDiff.getEntries();
         Set<String> skippedEntries = new HashSet<>();
-        for (String fileName : files) {
-            if (Thread.interrupted()) {
-                throw new InterruptedException();
-            }
-            File file = new File(directory, fileName);
-            String filePath = path + fileName;
-            DirectoryEntry baseEntry = baseEntries == null ? null : baseEntries.get(fileName);
-            File noBackup = new File(file, ".nobackup");
-            if (pathChecker != null && !pathChecker.test(filePath) || noBackup.exists()) {
-                ignoredItems.add(filePath);
-                continue;
-            }
-            Path filePathO = file.toPath();
-            if (Files.isSymbolicLink(filePathO)) {
-                if (diffAction == DiffAction.SUBDIRS_ONLY) {
+        try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(PathHack.get().createPath(directory.getAbsolutePath()))) {
+            for (Path filePathO : PathHack.get().fix(directoryStream)) {
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
+                String fileName = filePathO.toString();
+                fileName = fileName.substring(fileName.lastIndexOf(File.separator) + 1);
+                File file = new File(directory, fileName);
+                String filePath = path + fileName;
+                DirectoryEntry baseEntry = baseEntries == null ? null : baseEntries.get(fileName);
+                File noBackup = new File(file, ".nobackup");
+                if (pathChecker != null && !pathChecker.test(filePath) || noBackup.exists()) {
+                    ignoredItems.add(filePath);
                     continue;
                 }
-                try {
-                    String target = Files.readSymbolicLink(filePathO).toString();
-                    DirectoryEntrySymlink symlinkEntry = new DirectoryEntrySymlink(fileName, target);
-                    symlinkEntry.setParent(directoryEntry);
-                    addExtra(file, symlinkEntry);
-                    if (symlinkEntry.equals(baseEntry)) {
+                if (Files.isSymbolicLink(filePathO)) {
+                    if (diffAction == DiffAction.SUBDIRS_ONLY) {
+                        continue;
+                    }
+                    try {
+                        String target = Files.readSymbolicLink(filePathO).toString();
+                        DirectoryEntrySymlink symlinkEntry = new DirectoryEntrySymlink(fileName, target);
+                        symlinkEntry.setParent(directoryEntry);
+                        addExtra(file, symlinkEntry);
+                        if (symlinkEntry.equals(baseEntry)) {
+                            skippedEntries.add(fileName);
+                            continue;
+                        }
+                        entries.put(fileName, symlinkEntry);
+                        symlinkCount += 1L;
+                    } catch (Exception e) {
+                        failedItems.add(filePath);
+                    }
+                } else if (Files.isRegularFile(filePathO, LinkOption.NOFOLLOW_LINKS)) {
+                    if (diffAction == DiffAction.SUBDIRS_ONLY) {
+                        continue;
+                    }
+                    DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, file.lastModified(), file.length());
+                    fileEntry.setParent(directoryEntry);
+                    addExtra(file, fileEntry);
+                    if (baseEntry instanceof DirectoryEntryFile baseFile && fileEntry.equalsIgnoreHash(baseFile)) {
                         skippedEntries.add(fileName);
                         continue;
                     }
-                    entries.put(fileName, symlinkEntry);
-                    symlinkCount += 1L;
-                } catch (Exception e) {
-                    failedItems.add(filePath);
+                    entries.put(fileName, fileEntry);
+                    fileCount += 1L;
+                    unhashedFiles += 1L;
+                    totalFileSize += file.length();
+                    unhashedSize += file.length();
+                } else if (Files.isDirectory(filePathO, LinkOption.NOFOLLOW_LINKS)) {
+                    DiffAction subDirDiffAction = diffAction == DiffAction.FULL_SCAN ? DiffAction.FULL_SCAN : diffFunction.apply(filePath);
+                    if (subDirDiffAction == null) subDirDiffAction = DiffAction.FULL_SCAN;
+                    DirectoryEntryDirectoryMemory subDirectory = new DirectoryEntryDirectoryMemory(fileName);
+                    subDirectory.setParent(directoryEntry);
+                    addExtra(file, subDirectory);
+                    entries.put(fileName, subDirectory);
+                    directoryCount += 1L;
+                    if (subDirDiffAction == DiffAction.DO_NOT_SCAN) {
+                        continue;
+                    }
+                    DirectoryEntryDirectory subDirectoryBase = (baseEntry instanceof DirectoryEntryDirectory) ? baseEntry.asDirectory() : null;
+                    grabFiles(file, filePath + "/", subDirectory, subDirectoryBase, subDirDiffAction, ignoredItems, failedItems);
                 }
-            } else if (Files.isRegularFile(filePathO, LinkOption.NOFOLLOW_LINKS)) {
-                if (diffAction == DiffAction.SUBDIRS_ONLY) {
-                    continue;
-                }
-                DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, file.lastModified(), file.length());
-                fileEntry.setParent(directoryEntry);
-                addExtra(file, fileEntry);
-                if (baseEntry instanceof DirectoryEntryFile baseFile && fileEntry.equalsIgnoreHash(baseFile)) {
-                    skippedEntries.add(fileName);
-                    continue;
-                }
-                entries.put(fileName, fileEntry);
-                fileCount += 1L;
-                unhashedFiles += 1L;
-                totalFileSize += file.length();
-                unhashedSize += file.length();
-            } else if (Files.isDirectory(filePathO, LinkOption.NOFOLLOW_LINKS)) {
-                DiffAction subDirDiffAction = diffAction == DiffAction.FULL_SCAN ? DiffAction.FULL_SCAN : diffFunction.apply(filePath);
-                if (subDirDiffAction == null) subDirDiffAction = DiffAction.FULL_SCAN;
-                DirectoryEntryDirectoryMemory subDirectory = new DirectoryEntryDirectoryMemory(fileName);
-                subDirectory.setParent(directoryEntry);
-                addExtra(file, subDirectory);
-                entries.put(fileName, subDirectory);
-                directoryCount += 1L;
-                if (subDirDiffAction == DiffAction.DO_NOT_SCAN) {
-                    continue;
-                }
-                DirectoryEntryDirectory subDirectoryBase = (baseEntry instanceof DirectoryEntryDirectory) ? baseEntry.asDirectory() : null;
-                grabFiles(file, filePath + "/", subDirectory, subDirectoryBase, subDirDiffAction, ignoredItems, failedItems);
             }
+        } catch (IOException | DirectoryIteratorException e) {
+            return;
         }
         if (baseEntries != null && diffAction.level >= DiffAction.PARTIAL_SCAN.level) {
             for (String name : baseEntries.keySet()) {
