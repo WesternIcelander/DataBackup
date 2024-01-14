@@ -4,6 +4,8 @@ import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.util.RandomAccessData;
 import io.siggi.databackup.util.Serialization;
+
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.Reference;
@@ -57,7 +59,7 @@ public class DirectoryEntryFile extends DirectoryEntry {
     }
 
     private List<FileContent> readFileContents() {
-        try (InputStream in = data.getInputStream(contentOffset)) {
+        try (InputStream in = new BufferedInputStream(data.getInputStream(contentOffset))) {
             return Serialization.deserializeFileContents(in);
         } catch (IOException e) {
             return null;
