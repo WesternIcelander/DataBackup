@@ -3,6 +3,7 @@ package io.siggi.databackup.util;
 import io.siggi.databackup.data.DirectoryEntry;
 import io.siggi.databackup.data.DirectoryEntryDirectory;
 import io.siggi.databackup.data.DirectoryEntryDirectoryMemory;
+import io.siggi.databackup.data.DirectoryEntryFile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -31,6 +32,8 @@ public final class Util {
             DirectoryEntry value = entry.getValue();
             if (value instanceof DirectoryEntryDirectory dir) {
                 entry.setValue(recursivelyMakeMemory(dir));
+            } else if (value instanceof DirectoryEntryFile file) {
+                file.getFileContents(true);
             }
         }
         if (directory instanceof DirectoryEntryDirectoryMemory result) {
