@@ -47,16 +47,9 @@ public final class Serialization {
             } else if (entry instanceof DirectoryEntryFile file) {
                 out.write(DIRECTORY_ENTRY_FILE);
                 IO.writeString(out, name);
-                List<FileContent> fileContents = file.getFileContents();
-                if (fileContents.size() <= 1) {
-                    out.write(0);
-                    serializeFileContents(out, fileContents);
-                } else {
-                    out.write(1);
-                    long locationOfOffset = raf.getFilePointer();
-                    IO.writeLong(out, 0L); // placeholder
-                    files.add(new FileInfo(locationOfOffset, file));
-                }
+                long locationOfOffset = raf.getFilePointer();
+                IO.writeLong(out, 0L); // placeholder
+                files.add(new FileInfo(locationOfOffset, file));
                 IO.writeLong(out, file.getLastModified());
                 IO.writeLong(out, file.getSize());
             } else if (entry instanceof DirectoryEntryDirectory dir) {
@@ -78,11 +71,13 @@ public final class Serialization {
         }
         out.write(DIRECTORY_ENTRY_END);
         for (FileInfo fileInfo : files) {
+            List<FileContent> fileContents = fileInfo.file.getFileContents();
+            if (fileContents.isEmpty()) continue;
             long filePointer = raf.getFilePointer();
             raf.seek(fileInfo.locationOfOffset);
             IO.writeLong(out, filePointer);
             raf.seek(filePointer);
-            serializeFileContents(out, fileInfo.file.getFileContents());
+            serializeFileContents(out, fileContents);
         }
         for (DirectoryInfo directoryInfo : directories) {
             long filePointer = raf.getFilePointer();
@@ -94,19 +89,10 @@ public final class Serialization {
     }
 
     public static DirectoryEntryFile deserializeFile(InputStream in, RandomAccessData data, String name) throws IOException {
-        List<FileContent> fileContents = null;
-        long contentOffset = -1L;
-        switch (IO.readByte(in)) {
-            case 0:
-                fileContents = deserializeFileContents(in);
-                break;
-            case 1:
-                contentOffset = IO.readLong(in);
-                break;
-        }
+        long contentOffset = IO.readLong(in);
         long lastModified = IO.readLong(in);
         long size = IO.readLong(in);
-        return readExtraAndReturn(in, new DirectoryEntryFile(name, fileContents, contentOffset, data, lastModified, size));
+        return readExtraAndReturn(in, new DirectoryEntryFile(name, null, contentOffset, data, lastModified, size));
     }
 
     public static DirectoryEntryDirectoryDisk deserializeDirectory(InputStream in, RandomAccessData data, String name) throws IOException {
