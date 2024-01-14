@@ -41,6 +41,9 @@ public final class Util {
         } else {
             DirectoryEntryDirectoryMemory result = new DirectoryEntryDirectoryMemory(directory.getName());
             result.getExtra().addAll(directory.getExtra());
+            for (DirectoryEntry entry : entries.values()) {
+                entry.setParent(result);
+            }
             result.getEntries().putAll(entries);
             return result;
         }
