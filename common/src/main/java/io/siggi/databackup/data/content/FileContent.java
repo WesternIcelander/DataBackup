@@ -5,30 +5,30 @@ import io.siggi.databackup.util.IO;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 public abstract class FileContent {
 
     private static final List<Class<? extends FileContent>> types = new ArrayList<>();
-    private static final List<Constructor<? extends FileContent>> constructors = new ArrayList<>();
+    private static final List<Supplier<? extends FileContent>> suppliers = new ArrayList<>();
     static final int TYPE_SHA256 = 0;
     static final int TYPE_ZERO_FILLED = 1;
 
-    private static void addContentType(Class<? extends FileContent> type) {
+    private static <T extends FileContent> void addContentType(Class<T> type, Supplier<T> supplier) {
         try {
             types.add(type);
-            constructors.add(type.getDeclaredConstructor());
+            suppliers.add(supplier);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     static {
-        addContentType(Sha256FileContent.class);
-        addContentType(ZeroFilledFileContent.class);
+        addContentType(Sha256FileContent.class, Sha256FileContent::new);
+        addContentType(ZeroFilledFileContent.class, ZeroFilledFileContent::new);
     }
 
     public static Class<? extends FileContent> getType(int typeId) {
@@ -37,7 +37,7 @@ public abstract class FileContent {
 
     public static FileContent create(int typeId) {
         try {
-            return constructors.get(typeId).newInstance();
+            return suppliers.get(typeId).get();
         } catch (Exception e) {
             if (e instanceof RuntimeException) throw (RuntimeException) e;
             throw new RuntimeException(e);
