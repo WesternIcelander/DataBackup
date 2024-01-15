@@ -27,7 +27,7 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
     public Map<String, DirectoryEntry> getEntries() {
         Map<String, DirectoryEntry> entries = new HashMap<>();
         try {
-            InputStream in = new BufferedInputStream(data.getInputStream(offset));
+            InputStream in = data.getInputStream(offset);
             int id;
             while ((id = in.read()) != -1) {
                 if (id == Serialization.DIRECTORY_ENTRY_END) break;

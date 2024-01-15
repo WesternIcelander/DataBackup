@@ -1,6 +1,7 @@
 package io.siggi.databackup.util;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 public final class RandomAccessDataMemory extends RandomAccessData {
     private final byte[][] data;
@@ -14,7 +15,7 @@ public final class RandomAccessDataMemory extends RandomAccessData {
     }
 
     @Override
-    public In getInputStream(long startAt) {
+    public InputStream getInputStream(long startAt) {
         return new DataWrapper(startAt);
     }
 

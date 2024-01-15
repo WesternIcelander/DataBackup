@@ -1,6 +1,8 @@
 package io.siggi.databackup.util;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 
 public final class RandomAccessDataFile extends RandomAccessData {
@@ -11,8 +13,10 @@ public final class RandomAccessDataFile extends RandomAccessData {
     }
 
     @Override
-    public In getInputStream(long startAt) {
-        return new RafWrapper(startAt);
+    public InputStream getInputStream(long startAt) {
+        CountingInputStream stream = new CountingInputStream(new BufferedInputStream(new RafWrapper(startAt)));
+        stream.setFilePointer(startAt);
+        return stream;
     }
 
     @Override

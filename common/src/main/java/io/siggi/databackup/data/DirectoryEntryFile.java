@@ -60,7 +60,7 @@ public class DirectoryEntryFile extends DirectoryEntry {
 
     private List<FileContent> readFileContents() {
         if (contentOffset == 0L) return new ArrayList<>();
-        try (InputStream in = new BufferedInputStream(data.getInputStream(contentOffset))) {
+        try (InputStream in = data.getInputStream(contentOffset)) {
             return Serialization.deserializeFileContents(in);
         } catch (IOException e) {
             return null;

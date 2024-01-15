@@ -8,6 +8,7 @@ import io.siggi.databackup.util.Serialization;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Arrays;
@@ -45,7 +46,7 @@ public class BackupFile implements Closeable {
     private BackupFile(RandomAccessFile raf, RandomAccessData data) throws IOException {
         this.raf = raf;
         this.data = data;
-        RandomAccessData.In in = data.getInputStream(0L);
+        InputStream in = data.getInputStream(0L);
         if (!Arrays.equals(IO.readBytes(in, magicHeader.length), magicHeader)) {
             throw new IllegalArgumentException("Not a backup file");
         }
