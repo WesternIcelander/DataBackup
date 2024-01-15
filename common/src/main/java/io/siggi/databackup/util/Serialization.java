@@ -75,29 +75,37 @@ public final class Serialization {
             if (fileContents.isEmpty()) continue;
             long filePointer = raf.getFilePointer();
             raf.seek(fileInfo.locationOfOffset);
-            IO.writeLong(out, filePointer);
+            IO.writeLong(out, filePointer - fileInfo.locationOfOffset);
             raf.seek(filePointer);
             serializeFileContents(out, fileContents);
         }
         for (DirectoryInfo directoryInfo : directories) {
             long filePointer = raf.getFilePointer();
             raf.seek(directoryInfo.locationOfOffset);
-            IO.writeLong(out, filePointer);
+            IO.writeLong(out, filePointer - directoryInfo.locationOfOffset);
             raf.seek(filePointer);
             serializeDirectory(raf, out, directoryInfo.directory);
         }
     }
 
     public static DirectoryEntryFile deserializeFile(InputStream in, RandomAccessData data, String name) throws IOException {
+        long contentOffsetOffset = ((FilePointer) in).getFilePointer();
         long contentOffset = IO.readLong(in);
+        if (contentOffset != 0L) {
+            contentOffset += contentOffsetOffset;
+        }
         long lastModified = IO.readLong(in);
         long size = IO.readLong(in);
-        return readExtraAndReturn(in, new DirectoryEntryFile(name, null, contentOffset, data, lastModified, size));
+        return readExtraAndReturn(in, new DirectoryEntryFile(name, null, contentOffset, contentOffsetOffset, data, lastModified, size));
     }
 
     public static DirectoryEntryDirectoryDisk deserializeDirectory(InputStream in, RandomAccessData data, String name) throws IOException {
+        long offsetOffset = ((FilePointer) in).getFilePointer();
         long offset = IO.readLong(in);
-        return readExtraAndReturn(in, new DirectoryEntryDirectoryDisk(data, name, offset));
+        if (offset != 0L) {
+            offset += offsetOffset;
+        }
+        return readExtraAndReturn(in, new DirectoryEntryDirectoryDisk(data, name, offset, offsetOffset));
     }
 
     public static DirectoryEntrySymlink deserializeSymlink(InputStream in, String name) throws IOException {

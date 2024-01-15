@@ -18,18 +18,20 @@ public class DirectoryEntryFile extends DirectoryEntry {
     private List<FileContent> fileContents;
     private Reference<List<FileContent>> fileContentsReference;
     private final long contentOffset;
+    private final long contentOffsetOffset;
     private final RandomAccessData data;
     private final long lastModified;
     private final long size;
 
     public DirectoryEntryFile(String name, long lastModified, long size) {
-        this(name, new ArrayList<>(), 0L, null, lastModified, size);
+        this(name, new ArrayList<>(), 0L, 0L, null, lastModified, size);
     }
 
-    public DirectoryEntryFile(String name, List<FileContent> fileContents, long contentOffset, RandomAccessData data, long lastModified, long size) {
+    public DirectoryEntryFile(String name, List<FileContent> fileContents, long contentOffset, long contentOffsetOffset, RandomAccessData data, long lastModified, long size) {
         super(name);
         this.fileContents = fileContents;
         this.contentOffset = contentOffset;
+        this.contentOffsetOffset = contentOffsetOffset;
         this.data = data;
         this.lastModified = lastModified;
         this.size = size;

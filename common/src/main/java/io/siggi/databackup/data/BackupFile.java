@@ -1,5 +1,6 @@
 package io.siggi.databackup.data;
 
+import io.siggi.databackup.util.FilePointer;
 import io.siggi.databackup.util.IO;
 import io.siggi.databackup.util.RafOutputStream;
 import io.siggi.databackup.util.RandomAccessData;
@@ -55,8 +56,12 @@ public class BackupFile implements Closeable {
             throw new IllegalArgumentException("File version is newer than supported");
         }
         String rootName = IO.readString(in);
+        long startOfDirectoryOffset = ((FilePointer) in).getFilePointer();
         long startOfDirectory = IO.readLong(in);
-        rootDirectory = Serialization.readExtraAndReturn(in, new DirectoryEntryDirectoryDisk(data, rootName, startOfDirectory));
+        if (startOfDirectory != 0L) {
+            startOfDirectory += startOfDirectoryOffset;
+        }
+        rootDirectory = Serialization.readExtraAndReturn(in, new DirectoryEntryDirectoryDisk(data, rootName, startOfDirectory, startOfDirectoryOffset));
     }
 
     public DirectoryEntryDirectory getRootDirectory() {
@@ -85,7 +90,7 @@ public class BackupFile implements Closeable {
 
             long startOfDirectory = raf.getFilePointer();
             raf.seek(locationOfOffset);
-            IO.writeLong(out, startOfDirectory);
+            IO.writeLong(out, startOfDirectory - locationOfOffset);
             raf.seek(startOfDirectory);
 
             Serialization.serializeDirectory(raf, rootDirectory);

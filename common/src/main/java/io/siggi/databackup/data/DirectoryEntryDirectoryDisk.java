@@ -11,11 +11,13 @@ import java.util.Map;
 public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
     private final RandomAccessData data;
     private final long offset;
+    private final long offsetOffset;
 
-    public DirectoryEntryDirectoryDisk(RandomAccessData data, String name, long offset) {
+    public DirectoryEntryDirectoryDisk(RandomAccessData data, String name, long offset, long offsetOffset) {
         super(name);
         this.data = data;
         this.offset = offset;
+        this.offsetOffset = offsetOffset;
     }
 
     @Override
