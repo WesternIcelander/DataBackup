@@ -3,13 +3,18 @@ package io.siggi.databackup.util;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 
 public final class RandomAccessDataFile extends RandomAccessData {
     private final RandomAccessFile raf;
+    private final RafOutputStream rafOutputStream;
+    private final boolean writable;
 
-    public RandomAccessDataFile(RandomAccessFile raf) {
+    public RandomAccessDataFile(RandomAccessFile raf, boolean writable) {
         this.raf = raf;
+        this.rafOutputStream = writable ? new RafOutputStream(raf) : null;
+        this.writable = writable;
     }
 
     @Override
@@ -17,6 +22,20 @@ public final class RandomAccessDataFile extends RandomAccessData {
         CountingInputStream stream = new CountingInputStream(new BufferedInputStream(new RafWrapper(startAt)));
         stream.setFilePointer(startAt);
         return stream;
+    }
+
+    @Override
+    public OutputStream writeTo(long filePointer) throws IOException {
+        if (!writable) {
+            throw new IOException("File is open in read-only mode.");
+        }
+        raf.seek(filePointer);
+        return rafOutputStream;
+    }
+
+    @Override
+    public boolean isWritable() {
+        return writable;
     }
 
     @Override

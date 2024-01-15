@@ -23,11 +23,15 @@ public class BackupFile implements Closeable {
     private final DirectoryEntryDirectoryDisk rootDirectory;
 
     public static BackupFile open(File file) throws IOException {
+        return open(file, false);
+    }
+
+    public static BackupFile open(File file, boolean allowWriting) throws IOException {
         boolean success = false;
         RandomAccessFile raf = null;
         try {
-            raf = new RandomAccessFile(file, "r");
-            BackupFile backupFile = new BackupFile(raf, new RandomAccessDataFile(raf));
+            raf = new RandomAccessFile(file, allowWriting ? "rw" : "r");
+            BackupFile backupFile = new BackupFile(raf, new RandomAccessDataFile(raf, allowWriting));
             success = true;
             return backupFile;
         } finally {
