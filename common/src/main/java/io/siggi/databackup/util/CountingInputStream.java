@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.function.Consumer;
 
-public class CountingInputStream extends InputStream {
+public class CountingInputStream extends InputStream implements FilePointer {
     private final InputStream in;
     private long filePointer = 0L;
     private Consumer<CountingInputStream> closeHandler = null;
@@ -25,6 +25,7 @@ public class CountingInputStream extends InputStream {
         this.filePointer = filePointer;
     }
 
+    @Override
     public long getFilePointer() {
         return filePointer;
     }

@@ -28,7 +28,7 @@ public final class RandomAccessDataMemory extends RandomAccessData {
     public void close() {
     }
 
-    private class DataWrapper extends In {
+    private class DataWrapper extends In implements FilePointer {
         private DataWrapper(long pointer) {
             this.pointer = pointer;
             if (pointer < 0L) {
