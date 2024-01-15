@@ -5,11 +5,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 public final class RandomAccessDataFile extends RandomAccessData {
     private final RandomAccessFile raf;
     private final RafOutputStream rafOutputStream;
     private final boolean writable;
+    private boolean closed = false;
+    private final List<CountingInputStream> recentStreams = new LinkedList<>();
 
     public RandomAccessDataFile(RandomAccessFile raf, boolean writable) {
         this.raf = raf;
@@ -19,9 +24,30 @@ public final class RandomAccessDataFile extends RandomAccessData {
 
     @Override
     public InputStream getInputStream(long startAt) {
+        for (Iterator<CountingInputStream> it = recentStreams.iterator(); it.hasNext(); ) {
+            CountingInputStream stream = it.next();
+            long difference = startAt - stream.getFilePointer();
+            if (difference < 0L || difference >= 8192L) continue;
+            try {
+                if (difference != 0L) stream.skipNBytes(difference);
+                it.remove();
+                return stream;
+            } catch (IOException e) {
+                it.remove();
+            }
+        }
         CountingInputStream stream = new CountingInputStream(new BufferedInputStream(new RafWrapper(startAt)));
         stream.setFilePointer(startAt);
+        stream.setCloseHandler(this::closeStream);
         return stream;
+    }
+
+    private void closeStream(CountingInputStream stream) {
+        if (closed) return;
+        recentStreams.add(stream);
+        while (recentStreams.size() > 4) {
+            recentStreams.remove(recentStreams.size() - 1);
+        }
     }
 
     @Override
@@ -53,6 +79,8 @@ public final class RandomAccessDataFile extends RandomAccessData {
             raf.close();
         } catch (IOException ignored) {
         }
+        closed = true;
+        recentStreams.clear();
     }
 
     private class RafWrapper extends In {
