@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 
-public class RafOutputStream extends OutputStream {
+public class RafOutputStream extends OutputStream implements FilePointer {
     private final RandomAccessFile raf;
 
     public RafOutputStream(RandomAccessFile raf) {
@@ -24,5 +24,14 @@ public class RafOutputStream extends OutputStream {
     @Override
     public void write(byte[] buffer, int offset, int length) throws IOException {
         raf.write(buffer, offset, length);
+    }
+
+    @Override
+    public long getFilePointer() {
+        try {
+            return raf.getFilePointer();
+        } catch (IOException e) {
+            return 0L;
+        }
     }
 }
