@@ -1,8 +1,9 @@
 package io.siggi.databackup.data;
 
+import java.util.Iterator;
 import java.util.Map;
 
-public abstract class DirectoryEntryDirectory extends DirectoryEntry {
+public abstract class DirectoryEntryDirectory extends DirectoryEntry implements Iterable<DirectoryEntry> {
     protected DirectoryEntryDirectory(String name) {
         super(name);
     }
@@ -25,4 +26,8 @@ public abstract class DirectoryEntryDirectory extends DirectoryEntry {
     public abstract DirectoryEntry getEntry(String name);
 
     public abstract Map<String,DirectoryEntry> getEntries();
+
+    public Iterator<DirectoryEntry> iterator() {
+        return getEntries().values().iterator();
+    }
 }

@@ -2,7 +2,9 @@ package io.siggi.databackup.data;
 
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
+import io.siggi.databackup.util.IO;
 import io.siggi.databackup.util.RandomAccessData;
+import io.siggi.databackup.util.ReadingIterator;
 import io.siggi.databackup.util.Serialization;
 
 import java.io.BufferedInputStream;
@@ -11,10 +13,12 @@ import java.io.InputStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
-public class DirectoryEntryFile extends DirectoryEntry {
+public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileContent> {
     private List<FileContent> fileContents;
     private Reference<List<FileContent>> fileContentsReference;
     private final long contentOffset;
@@ -35,6 +39,41 @@ public class DirectoryEntryFile extends DirectoryEntry {
         this.data = data;
         this.lastModified = lastModified;
         this.size = size;
+    }
+
+    public Iterator<FileContent> iterator() {
+        if (fileContents != null) return fileContents.iterator();
+        if (fileContentsReference != null) {
+            List<FileContent> contents = fileContentsReference.get();
+            if (contents != null) return contents.iterator();
+        }
+        if (contentOffset == 0L) return new ReadingIterator<>() {
+            @Override
+            protected FileContent read() {
+                return null;
+            }
+        };
+        InputStream in = data.getInputStream(contentOffset);
+        return new ReadingIterator<>() {
+            int count = -1;
+            @Override
+            protected FileContent read() {
+                try {
+                    if (count == -1) count = IO.readInt(in);
+                    if (count == 0) {
+                        in.close();
+                        return null;
+                    }
+                    count -= 1;
+                    int typeId = IO.readShort(in);
+                    FileContent content = FileContent.create(typeId);
+                    content.read(in);
+                    return content;
+                } catch (IOException e) {
+                    throw new DirectoryEntryException("IOException occurred", e);
+                }
+            }
+        };
     }
 
     public final List<FileContent> getFileContents() {
@@ -62,11 +101,11 @@ public class DirectoryEntryFile extends DirectoryEntry {
 
     private List<FileContent> readFileContents() {
         if (contentOffset == 0L) return new ArrayList<>();
-        try (InputStream in = data.getInputStream(contentOffset)) {
-            return Serialization.deserializeFileContents(in);
-        } catch (IOException e) {
-            return null;
+        List<FileContent> contents = new LinkedList<>();
+        for (FileContent content : this) {
+            contents.add(content);
         }
+        return contents;
     }
 
     public final long getLastModified() {
