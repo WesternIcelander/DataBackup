@@ -31,6 +31,7 @@ public final class RandomAccessDataFile extends RandomAccessData {
             try {
                 if (difference != 0L) stream.skipNBytes(difference);
                 it.remove();
+                stream.setCloseHandler(this::closeStream);
                 return stream;
             } catch (IOException e) {
                 it.remove();
@@ -45,6 +46,9 @@ public final class RandomAccessDataFile extends RandomAccessData {
     private void closeStream(CountingInputStream stream) {
         if (closed) return;
         recentStreams.add(stream);
+        stream.setCloseHandler((s) -> {
+            // intentionally do nothing so if the stream is double-closed nothing happens
+        });
         while (recentStreams.size() > 4) {
             recentStreams.remove(recentStreams.size() - 1);
         }
