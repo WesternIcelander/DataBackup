@@ -81,9 +81,7 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
             List<FileContent> weakContents = fileContentsReference == null ? null : fileContentsReference.get();
             if (weakContents == null) {
                 weakContents = readFileContents();
-                if (weakContents != null) {
-                    fileContentsReference = new WeakReference<>(weakContents);
-                }
+                fileContentsReference = new WeakReference<>(weakContents);
             }
             return weakContents;
         }
