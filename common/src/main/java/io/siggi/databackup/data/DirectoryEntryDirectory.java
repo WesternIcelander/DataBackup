@@ -1,5 +1,8 @@
 package io.siggi.databackup.data;
 
+import io.siggi.databackup.util.ObjectWriter;
+
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -7,6 +10,8 @@ public abstract class DirectoryEntryDirectory extends DirectoryEntry implements 
     protected DirectoryEntryDirectory(String name) {
         super(name);
     }
+
+    private long offsetOffset = 0L;
 
     @Override
     public final boolean isDirectory() {
@@ -29,5 +34,17 @@ public abstract class DirectoryEntryDirectory extends DirectoryEntry implements 
 
     public Iterator<DirectoryEntry> iterator() {
         return getEntries().values().iterator();
+    }
+
+    public ObjectWriter<DirectoryEntry> updateEntries() throws IOException {
+        throw new IOException("File open in read-only mode.");
+    }
+
+    public long getDirectoryOffsetOffset() {
+        return offsetOffset;
+    }
+
+    public void setDirectoryOffsetOffset(long newOffset) {
+        this.offsetOffset = newOffset;
     }
 }

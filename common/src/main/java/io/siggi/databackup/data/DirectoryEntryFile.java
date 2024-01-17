@@ -3,6 +3,7 @@ package io.siggi.databackup.data;
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.util.IO;
+import io.siggi.databackup.util.ObjectWriter;
 import io.siggi.databackup.util.RandomAccessData;
 import io.siggi.databackup.util.ReadingIterator;
 import io.siggi.databackup.util.Serialization;
@@ -10,6 +11,7 @@ import io.siggi.databackup.util.Serialization;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -21,8 +23,8 @@ import java.util.Objects;
 public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileContent> {
     private List<FileContent> fileContents;
     private Reference<List<FileContent>> fileContentsReference;
-    private final long contentOffset;
-    private final long contentOffsetOffset;
+    private long contentOffset;
+    private long contentOffsetOffset;
     private final RandomAccessData data;
     private final long lastModified;
     private final long size;
@@ -104,6 +106,55 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
             contents.add(content);
         }
         return contents;
+    }
+
+    public ObjectWriter<FileContent> updateFileContents() throws IOException {
+        if (data == null) throw new IOException("File open in read-only mode.");
+        long newOffset = data.getLength();
+        OutputStream out = data.writeTo(newOffset);
+        IO.writeInt(out, 0); // placeholder
+        return new ObjectWriter<>() {
+            boolean closed = false;
+            int count = 0;
+            @Override
+            public void write(FileContent value) throws IOException {
+                if (closed) throw new IOException("Already closed.");
+                IO.writeShort(out, value.getTypeId());
+                value.write(out);
+                count += 1;
+            }
+
+            @Override
+            public void close() throws IOException {
+                if (closed) return;
+                closed = true;
+                out.close();
+                try (OutputStream countStream = data.writeTo(newOffset)) {
+                    IO.writeInt(countStream, count);
+                }
+                long newOffsetToWrite = newOffset - contentOffsetOffset;
+                contentOffset = newOffset;
+                try (OutputStream offsetStream = data.writeTo(contentOffsetOffset)) {
+                    IO.writeLong(offsetStream, newOffsetToWrite);
+                }
+            }
+        };
+    }
+
+    public long getFileContentOffset() {
+        return contentOffset;
+    }
+
+    public void setFileContentOffset(long newOffset) {
+        this.contentOffset = newOffset;
+    }
+
+    public long getFileContentOffsetOffset() {
+        return contentOffsetOffset;
+    }
+
+    public void setFileContentOffsetOffset(long newOffset) {
+        this.contentOffsetOffset = newOffset;
     }
 
     public final long getLastModified() {

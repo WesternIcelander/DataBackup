@@ -35,56 +35,65 @@ public final class Serialization {
     private static void serializeDirectory(RandomAccessFile raf, RafOutputStream out, DirectoryEntryDirectory directory) throws IOException {
         Map<String, DirectoryEntry> entries = directory.getEntries();
         List<String> names = Util.sortedKeys(entries);
-        List<FileInfo> files = new LinkedList<>();
-        List<DirectoryInfo> directories = new LinkedList<>();
         for (String name : names) {
             DirectoryEntry entry = entries.get(name);
-            boolean skipExtra = false;
-            if (entry instanceof DirectoryEntryNull) {
-                out.write(DIRECTORY_ENTRY_NULL);
-                IO.writeString(out, name);
-                skipExtra = true;
-            } else if (entry instanceof DirectoryEntryFile file) {
-                out.write(DIRECTORY_ENTRY_FILE);
-                IO.writeString(out, name);
-                long locationOfOffset = raf.getFilePointer();
-                IO.writeLong(out, 0L); // placeholder
-                files.add(new FileInfo(locationOfOffset, file));
-                IO.writeLong(out, file.getLastModified());
-                IO.writeLong(out, file.getSize());
-            } else if (entry instanceof DirectoryEntryDirectory dir) {
-                out.write(DIRECTORY_ENTRY_DIRECTORY);
-                IO.writeString(out, name);
-                long locationOfOffset = raf.getFilePointer();
-                IO.writeLong(out, 0L); // placeholder
-                directories.add(new DirectoryInfo(locationOfOffset, dir));
-            } else if (entry instanceof DirectoryEntrySymlink symlink) {
-                out.write(DIRECTORY_ENTRY_SYMLINK);
-                IO.writeString(out, name);
-                IO.writeString(out, symlink.getTarget());
-            } else {
-                throw new IllegalArgumentException("Unhandled entry " + entry.getClass().getName());
-            }
-            if (!skipExtra) {
-                writeExtra(out, entry.getExtra());
-            }
+            serializeDirectoryEntry(out, entry);
         }
         out.write(DIRECTORY_ENTRY_END);
-        for (FileInfo fileInfo : files) {
-            List<FileContent> fileContents = fileInfo.file.getFileContents();
-            if (fileContents.isEmpty()) continue;
+        for (String name : names) {
+            DirectoryEntry entry = entries.get(name);
+            if (!(entry instanceof DirectoryEntryFile file)) continue;
+            List<FileContent> fileContents = file.getFileContents();
+            if (fileContents.isEmpty()) {
+                file.setFileContentOffset(0L);
+                continue;
+            }
             long filePointer = raf.getFilePointer();
-            raf.seek(fileInfo.locationOfOffset);
-            IO.writeLong(out, filePointer - fileInfo.locationOfOffset);
+            file.setFileContentOffset(filePointer);
+            raf.seek(file.getFileContentOffsetOffset());
+            IO.writeLong(out, filePointer - file.getFileContentOffsetOffset());
             raf.seek(filePointer);
             serializeFileContents(out, fileContents);
         }
-        for (DirectoryInfo directoryInfo : directories) {
+        for (String name : names) {
+            DirectoryEntry entry = entries.get(name);
+            if (!(entry instanceof DirectoryEntryDirectory dir)) continue;
             long filePointer = raf.getFilePointer();
-            raf.seek(directoryInfo.locationOfOffset);
-            IO.writeLong(out, filePointer - directoryInfo.locationOfOffset);
+            raf.seek(dir.getDirectoryOffsetOffset());
+            IO.writeLong(out, filePointer - dir.getDirectoryOffsetOffset());
             raf.seek(filePointer);
-            serializeDirectory(raf, out, directoryInfo.directory);
+            serializeDirectory(raf, out, dir);
+        }
+    }
+
+    public static void serializeDirectoryEntry(OutputStream out, DirectoryEntry entry) throws IOException {
+        FilePointer filePointer = (FilePointer) out;
+        boolean skipExtra = false;
+        if (entry instanceof DirectoryEntryNull) {
+            out.write(DIRECTORY_ENTRY_NULL);
+            IO.writeString(out, entry.getName());
+            skipExtra = true;
+        } else if (entry instanceof DirectoryEntryFile file) {
+            out.write(DIRECTORY_ENTRY_FILE);
+            IO.writeString(out, file.getName());
+            file.setFileContentOffsetOffset(filePointer.getFilePointer());
+            IO.writeLong(out, 0L); // placeholder
+            IO.writeLong(out, file.getLastModified());
+            IO.writeLong(out, file.getSize());
+        } else if (entry instanceof DirectoryEntryDirectory dir) {
+            out.write(DIRECTORY_ENTRY_DIRECTORY);
+            IO.writeString(out, dir.getName());
+            dir.setDirectoryOffsetOffset(filePointer.getFilePointer());
+            IO.writeLong(out, 0L); // placeholder
+        } else if (entry instanceof DirectoryEntrySymlink symlink) {
+            out.write(DIRECTORY_ENTRY_SYMLINK);
+            IO.writeString(out, symlink.getName());
+            IO.writeString(out, symlink.getTarget());
+        } else {
+            throw new IllegalArgumentException("Unhandled entry " + entry.getClass().getName());
+        }
+        if (!skipExtra) {
+            writeExtra(out, entry.getExtra());
         }
     }
 
@@ -156,11 +165,5 @@ public final class Serialization {
             contents.add(content);
         }
         return contents;
-    }
-
-    private record DirectoryInfo(long locationOfOffset, DirectoryEntryDirectory directory) {
-    }
-
-    private record FileInfo(long locationOfOffset, DirectoryEntryFile file) {
     }
 }

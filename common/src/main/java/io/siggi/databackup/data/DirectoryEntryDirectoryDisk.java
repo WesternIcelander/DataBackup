@@ -1,12 +1,15 @@
 package io.siggi.databackup.data;
 
+import io.siggi.databackup.util.FilePointer;
 import io.siggi.databackup.util.IO;
+import io.siggi.databackup.util.ObjectWriter;
 import io.siggi.databackup.util.RandomAccessData;
 import io.siggi.databackup.util.ReadingIterator;
 import io.siggi.databackup.util.Serialization;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -14,13 +17,12 @@ import java.util.Map;
 public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
     private final RandomAccessData data;
     private final long offset;
-    private final long offsetOffset;
 
     public DirectoryEntryDirectoryDisk(RandomAccessData data, String name, long offset, long offsetOffset) {
         super(name);
         this.data = data;
         this.offset = offset;
-        this.offsetOffset = offsetOffset;
+        setDirectoryOffsetOffset(offsetOffset);
     }
 
     @Override
@@ -81,5 +83,27 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
             entries.put(entry.getName(), entry);
         }
         return entries;
+    }
+
+    @Override
+    public ObjectWriter<DirectoryEntry> updateEntries() throws IOException {
+        long newOffset = data.getLength();
+        OutputStream out = data.writeTo(newOffset);
+        return new ObjectWriter<>() {
+            boolean closed = false;
+            @Override
+            public void write(DirectoryEntry entry) throws IOException {
+                if (closed) throw new IOException("Already closed.");
+                Serialization.serializeDirectoryEntry(out, entry);
+            }
+
+            @Override
+            public void close() throws IOException {
+                if (closed) return;
+                closed = true;
+                out.write(Serialization.DIRECTORY_ENTRY_END);
+                out.close();
+            }
+        };
     }
 }
