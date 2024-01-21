@@ -30,7 +30,7 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
     private final long size;
 
     public DirectoryEntryFile(String name, long lastModified, long size) {
-        this(name, new ArrayList<>(), 0L, 0L, null, lastModified, size);
+        this(name, new LinkedList<>(), 0L, 0L, null, lastModified, size);
     }
 
     public DirectoryEntryFile(String name, List<FileContent> fileContents, long contentOffset, long contentOffsetOffset, RandomAccessData data, long lastModified, long size) {
