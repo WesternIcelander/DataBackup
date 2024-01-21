@@ -218,7 +218,7 @@ public class FileMetadataScanner {
             String name = entry.getName();
             if (entry.isFile()) {
                 DirectoryEntryFile file = entry.asFile();
-                if (!file.getFileContents().isEmpty()) {
+                if (file.hasFileContents()) {
                     continue;
                 }
                 String filePath = path + name;
