@@ -214,10 +214,8 @@ public class FileMetadataScanner {
     }
 
     private void fillInHashes(Consumer<String> status, DirectoryEntryDirectoryMemory directory, String path) throws InterruptedException {
-        Map<String, DirectoryEntry> entries = directory.getEntries();
-        List<String> names = Util.sortedKeys(entries);
-        for (String name : names) {
-            DirectoryEntry entry = entries.get(name);
+        for (DirectoryEntry entry : directory) {
+            String name = entry.getName();
             if (entry.isFile()) {
                 DirectoryEntryFile file = entry.asFile();
                 if (!file.getFileContents().isEmpty()) {
