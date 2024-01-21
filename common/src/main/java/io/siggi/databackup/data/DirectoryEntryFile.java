@@ -114,7 +114,22 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
     }
 
     public ObjectWriter<FileContent> updateFileContents() throws IOException {
-        if (data == null) throw new IOException("File open in read-only mode.");
+        if (data == null) {
+            fileContents = new LinkedList<>();
+            return new ObjectWriter<>() {
+                boolean closed = false;
+                @Override
+                public void write(FileContent value) throws IOException {
+                    if (closed) throw new IOException("Already closed.");
+                    fileContents.add(value);
+                }
+
+                @Override
+                public void close() throws Exception {
+                    closed = true;
+                }
+            };
+        }
         fileContents = null;
         fileContentsReference = null;
         long newOffset = data.getLength();
