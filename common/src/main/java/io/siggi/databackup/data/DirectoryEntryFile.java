@@ -110,6 +110,8 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
 
     public ObjectWriter<FileContent> updateFileContents() throws IOException {
         if (data == null) throw new IOException("File open in read-only mode.");
+        fileContents = null;
+        fileContentsReference = null;
         long newOffset = data.getLength();
         OutputStream out = data.writeTo(newOffset);
         IO.writeInt(out, 0); // placeholder
