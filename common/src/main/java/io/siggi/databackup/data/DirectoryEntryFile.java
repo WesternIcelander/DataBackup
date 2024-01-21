@@ -78,6 +78,11 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
         };
     }
 
+    public boolean hasFileContents() {
+        if (fileContents != null) return !fileContents.isEmpty();
+        return contentOffset != 0L;
+    }
+
     public final List<FileContent> getFileContents() {
         if (fileContents == null) {
             List<FileContent> weakContents = fileContentsReference == null ? null : fileContentsReference.get();
