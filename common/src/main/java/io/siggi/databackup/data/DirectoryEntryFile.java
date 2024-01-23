@@ -125,7 +125,7 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
                 }
 
                 @Override
-                public void close() throws Exception {
+                public void close() throws IOException {
                     closed = true;
                 }
             };
