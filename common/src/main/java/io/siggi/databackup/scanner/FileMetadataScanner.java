@@ -38,7 +38,7 @@ import java.util.function.Predicate;
 public class FileMetadataScanner {
 
     public final File rootFile;
-    public final DirectoryEntryDirectoryMemory rootDirectory;
+    public final DirectoryEntryDirectory rootDirectory;
     public final List<String> ignoredItems = new LinkedList<>();
     public final List<String> failedItems = new LinkedList<>();
     private Predicate<String> pathChecker;
@@ -53,13 +53,18 @@ public class FileMetadataScanner {
     public long symlinkCount = 0L;
 
     public FileMetadataScanner(File rootFile) {
-        this.rootFile = rootFile;
-        this.rootDirectory = new DirectoryEntryDirectoryMemory("ROOT");
+        this(new DirectoryEntryDirectoryMemory("ROOT"), rootFile);
         String absolutePath = rootFile.getAbsolutePath().replace(File.separatorChar, '/');
         while (absolutePath.endsWith("/")) {
             absolutePath = absolutePath.substring(0, absolutePath.length() - 1);
         }
         this.rootDirectory.getExtra().add(new ExtraDataFilePath(absolutePath));
+    }
+
+    public FileMetadataScanner(DirectoryEntryDirectory rootDirectory, File rootFile) {
+        if (rootDirectory == null || rootFile == null) throw new NullPointerException();
+        this.rootDirectory = rootDirectory;
+        this.rootFile = rootFile;
     }
 
     public FileMetadataScanner setPathPredicate(Predicate<String> pathPredicate) {
