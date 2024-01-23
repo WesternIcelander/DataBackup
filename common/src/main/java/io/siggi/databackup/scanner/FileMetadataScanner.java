@@ -6,12 +6,14 @@ import io.siggi.databackup.data.DirectoryEntryDirectoryMemory;
 import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.DirectoryEntryNull;
 import io.siggi.databackup.data.DirectoryEntrySymlink;
+import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.content.Sha256FileContent;
 import io.siggi.databackup.data.extra.ExtraDataFilePath;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
 import io.siggi.databackup.util.IO;
 import io.siggi.databackup.util.MessageDigestOutputStream;
+import io.siggi.databackup.util.ObjectWriter;
 import io.siggi.databackup.util.Util;
 import io.siggi.databackup.util.pathhack.PathHack;
 import io.siggi.stat.Stat;
@@ -176,18 +178,17 @@ public class FileMetadataScanner {
         }
     }
 
-    public void copyHashes(DirectoryEntryDirectory root) throws InterruptedException {
+    public void copyHashes(DirectoryEntryDirectory root) throws IOException, InterruptedException {
         copyHashes(root, rootDirectory);
     }
 
-    private void copyHashes(DirectoryEntryDirectory from, DirectoryEntryDirectoryMemory to) throws InterruptedException {
+    private void copyHashes(DirectoryEntryDirectory from, DirectoryEntryDirectoryMemory to) throws IOException, InterruptedException {
         if (Thread.interrupted()) {
             throw new InterruptedException();
         }
         Map<String, DirectoryEntry> fromEntries = from.getEntries();
-        for (Map.Entry<String, DirectoryEntry> entry : to.getEntries().entrySet()) {
-            String name = entry.getKey();
-            DirectoryEntry toValue = entry.getValue();
+        for (DirectoryEntry toValue : to) {
+            String name = to.getName();
             DirectoryEntry fromValue = fromEntries.get(name);
             if (fromValue == null) continue;
             if (fromValue.isDirectory() && toValue.isDirectory()) {
@@ -198,12 +199,16 @@ public class FileMetadataScanner {
                 DirectoryEntryFile fromFile = fromValue.asFile();
                 DirectoryEntryFile toFile = toValue.asFile();
                 if (fromFile.getSize() != toFile.getSize() || !fromFile.hasSameLastModified(toFile)) continue;
-                if (!fromFile.getFileContents().isEmpty()) {
-                    if (toFile.getFileContents().isEmpty()) {
+                if (fromFile.hasFileContents()) {
+                    if (!toFile.hasFileContents()) {
                         unhashedSize -= toFile.getSize();
                         unhashedFiles -= 1;
                     }
-                    toFile.getFileContents().addAll(fromFile.getFileContents());
+                    try (ObjectWriter<FileContent> writer = toFile.updateFileContents()) {
+                        for (FileContent content : fromFile) {
+                            writer.write(content);
+                        }
+                    }
                 }
             }
         }
@@ -234,7 +239,9 @@ public class FileMetadataScanner {
                     fileContent.setOffset(0L);
                     fileContent.setLength(file.getSize());
                     System.arraycopy(digest, 0, fileContent.getHash(), 0, 32);
-                    file.getFileContents().add(fileContent);
+                    try (ObjectWriter<FileContent> writer = file.updateFileContents()) {
+                        writer.write(fileContent);
+                    }
                     failed = false;
                 } catch (InterruptedException e) {
                     throw e;
