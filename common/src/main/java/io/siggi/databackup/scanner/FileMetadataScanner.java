@@ -85,7 +85,7 @@ public class FileMetadataScanner {
         return this;
     }
 
-    private void grabFiles(File directory, String path, DirectoryEntryDirectoryMemory directoryEntry,
+    private void grabFiles(File directory, String path, DirectoryEntryDirectory directoryEntry,
                            DirectoryEntryDirectory baseForDiff, DiffAction diffAction,
                            List<String> ignoredItems, List<String> failedItems) throws IOException, InterruptedException {
         Map<String, DirectoryEntry> baseEntries = baseForDiff == null ? null : baseForDiff.getEntries();
@@ -188,7 +188,7 @@ public class FileMetadataScanner {
         copyHashes(root, rootDirectory);
     }
 
-    private void copyHashes(DirectoryEntryDirectory from, DirectoryEntryDirectoryMemory to) throws IOException, InterruptedException {
+    private void copyHashes(DirectoryEntryDirectory from, DirectoryEntryDirectory to) throws IOException, InterruptedException {
         if (Thread.interrupted()) {
             throw new InterruptedException();
         }
@@ -198,9 +198,7 @@ public class FileMetadataScanner {
             DirectoryEntry fromValue = fromEntries.get(name);
             if (fromValue == null) continue;
             if (fromValue.isDirectory() && toValue.isDirectory()) {
-                if (toValue instanceof DirectoryEntryDirectoryMemory toDirectory) {
-                    copyHashes(fromValue.asDirectory(), toDirectory);
-                }
+                copyHashes(fromValue.asDirectory(), toValue.asDirectory());
             } else if (fromValue.isFile() && toValue.isFile()) {
                 DirectoryEntryFile fromFile = fromValue.asFile();
                 DirectoryEntryFile toFile = toValue.asFile();
@@ -224,7 +222,7 @@ public class FileMetadataScanner {
         fillInHashes(status, rootDirectory, "");
     }
 
-    private void fillInHashes(Consumer<String> status, DirectoryEntryDirectoryMemory directory, String path) throws InterruptedException {
+    private void fillInHashes(Consumer<String> status, DirectoryEntryDirectory directory, String path) throws InterruptedException {
         for (DirectoryEntry entry : directory) {
             String name = entry.getName();
             if (entry.isFile()) {
@@ -262,9 +260,8 @@ public class FileMetadataScanner {
                     }
                 }
             } else if (entry.isDirectory()) {
-                DirectoryEntryDirectoryMemory subDirectory = (DirectoryEntryDirectoryMemory) entry;
                 String directoryPath = path + name + "/";
-                fillInHashes(status, subDirectory, directoryPath);
+                fillInHashes(status, entry.asDirectory(), directoryPath);
             }
         }
     }
