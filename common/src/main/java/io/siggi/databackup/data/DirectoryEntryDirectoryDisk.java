@@ -16,7 +16,7 @@ import java.util.Map;
 
 public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
     private final RandomAccessData data;
-    private final long offset;
+    private long offset;
 
     public DirectoryEntryDirectoryDisk(RandomAccessData data, String name, long offset, long offsetOffset) {
         super(name);
@@ -103,6 +103,11 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
                 closed = true;
                 out.write(Serialization.DIRECTORY_ENTRY_END);
                 out.close();
+                long offsetOffset = getDirectoryOffsetOffset();
+                try (OutputStream offsetUpdater = data.writeTo(offsetOffset)) {
+                    IO.writeLong(offsetUpdater, newOffset - offsetOffset);
+                }
+                offset = newOffset;
             }
         };
     }
