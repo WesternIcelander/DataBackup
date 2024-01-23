@@ -149,19 +149,12 @@ public class FileMetadataScanner {
                         totalFileSize += file.length();
                         unhashedSize += file.length();
                     } else if (Files.isDirectory(filePathO, LinkOption.NOFOLLOW_LINKS)) {
-                        DiffAction subDirDiffAction = diffAction == DiffAction.FULL_SCAN ? DiffAction.FULL_SCAN : diffFunction.apply(filePath);
-                        if (subDirDiffAction == null) subDirDiffAction = DiffAction.FULL_SCAN;
                         DirectoryEntryDirectoryMemory subDirectory = new DirectoryEntryDirectoryMemory(fileName);
                         subDirectory.setParent(directoryEntry);
                         addExtra(file, subDirectory);
                         writer.write(subDirectory);
                         addedEntries.add(fileName);
                         directoryCount += 1L;
-                        if (subDirDiffAction == DiffAction.DO_NOT_SCAN) {
-                            continue;
-                        }
-                        DirectoryEntryDirectory subDirectoryBase = (baseEntry instanceof DirectoryEntryDirectory) ? baseEntry.asDirectory() : null;
-                        grabFiles(file, filePath + "/", subDirectory, subDirectoryBase, subDirDiffAction, ignoredItems, failedItems);
                     }
                 }
             } catch (IOException | DirectoryIteratorException e) {
@@ -174,6 +167,26 @@ public class FileMetadataScanner {
                         addedEntries.add(name);
                     }
                 }
+            }
+        }
+        for (DirectoryEntry entry : directoryEntry) {
+            if (entry.isDirectory()) {
+                DirectoryEntryDirectory subDirectory = entry.asDirectory();
+
+                String fileName = subDirectory.getName();
+                File file = new File(directory, fileName);
+                String filePath = path + fileName;
+
+                DiffAction subDirDiffAction = diffAction == DiffAction.FULL_SCAN ? DiffAction.FULL_SCAN : diffFunction.apply(filePath);
+                if (subDirDiffAction == null) subDirDiffAction = DiffAction.FULL_SCAN;
+                if (subDirDiffAction == DiffAction.DO_NOT_SCAN) {
+                    continue;
+                }
+
+                DirectoryEntry baseEntry = baseEntries == null ? null : baseEntries.get(subDirectory.getName());
+                DirectoryEntryDirectory subDirectoryBase = (baseEntry instanceof DirectoryEntryDirectory) ? baseEntry.asDirectory() : null;
+
+                grabFiles(file, filePath + "/", subDirectory, subDirectoryBase, subDirDiffAction, ignoredItems, failedItems);
             }
         }
     }
