@@ -34,6 +34,14 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
 
     @Override
     public Iterator<DirectoryEntry> iterator() {
+        if (offset == 0L) {
+            return new ReadingIterator<>() {
+                @Override
+                protected DirectoryEntry read() {
+                    return null;
+                }
+            };
+        }
         InputStream in = data.getInputStream(offset);
         return new ReadingIterator<>() {
             @Override
