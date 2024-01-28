@@ -98,6 +98,14 @@ public class BackupFile implements Closeable {
             raf.seek(startOfDirectory);
 
             Serialization.serializeDirectory(raf, rootDirectory);
+
+            if (raf.length() == startOfDirectory + 1L) {
+                // Only an end of directory entry was written
+                // Remove the directory and set the location offset to 0
+                raf.seek(locationOfOffset);
+                IO.writeLong(out, 0L);
+                raf.setLength(startOfDirectory);
+            }
         }
     }
 }
