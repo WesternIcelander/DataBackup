@@ -10,6 +10,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -17,6 +18,7 @@ import java.util.Map;
 public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
     private final RandomAccessData data;
     private long offset;
+    private SoftReference<Map<String,DirectoryEntry>> softEntries;
 
     public DirectoryEntryDirectoryDisk(RandomAccessData data, String name, long offset, long offsetOffset) {
         super(name);
@@ -78,15 +80,21 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
 
     @Override
     public Map<String, DirectoryEntry> getEntries() {
+        if (softEntries != null) {
+            Map<String, DirectoryEntry> entries = softEntries.get();
+            if (entries != null) return entries;
+        }
         Map<String, DirectoryEntry> entries = new HashMap<>();
         for (DirectoryEntry entry : this) {
             entries.put(entry.getName(), entry);
         }
+        softEntries = new SoftReference<>(entries);
         return entries;
     }
 
     @Override
     public ObjectWriter<DirectoryEntry> updateEntries() throws IOException {
+        softEntries = null;
         long newOffset = data.getLength();
         OutputStream out = data.writeTo(newOffset);
         return new ObjectWriter<>() {
