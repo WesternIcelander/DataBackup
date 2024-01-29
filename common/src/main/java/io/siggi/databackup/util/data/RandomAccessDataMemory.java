@@ -1,4 +1,6 @@
-package io.siggi.databackup.util;
+package io.siggi.databackup.util.data;
+
+import io.siggi.databackup.util.stream.FilePointer;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,4 +1,7 @@
-package io.siggi.databackup.util;
+package io.siggi.databackup.util.data;
+
+import io.siggi.databackup.util.stream.CountingInputStream;
+import io.siggi.databackup.util.stream.RafOutputStream;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

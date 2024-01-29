@@ -1,6 +1,6 @@
 package io.siggi.databackup.data.extra;
 
-import io.siggi.databackup.util.IO;
+import io.siggi.databackup.util.stream.IO;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

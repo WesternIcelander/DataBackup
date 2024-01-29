@@ -2,13 +2,11 @@ package io.siggi.databackup.data;
 
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
-import io.siggi.databackup.util.IO;
+import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.ObjectWriter;
-import io.siggi.databackup.util.RandomAccessData;
+import io.siggi.databackup.util.data.RandomAccessData;
 import io.siggi.databackup.util.ReadingIterator;
-import io.siggi.databackup.util.Serialization;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

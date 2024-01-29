@@ -1,4 +1,4 @@
-package io.siggi.databackup.util;
+package io.siggi.databackup.util.stream;
 
 import java.io.OutputStream;
 import java.security.MessageDigest;

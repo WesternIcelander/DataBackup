@@ -1,10 +1,10 @@
 package io.siggi.databackup.data;
 
-import io.siggi.databackup.util.FilePointer;
-import io.siggi.databackup.util.IO;
-import io.siggi.databackup.util.RafOutputStream;
-import io.siggi.databackup.util.RandomAccessData;
-import io.siggi.databackup.util.RandomAccessDataFile;
+import io.siggi.databackup.util.stream.FilePointer;
+import io.siggi.databackup.util.stream.IO;
+import io.siggi.databackup.util.stream.RafOutputStream;
+import io.siggi.databackup.util.data.RandomAccessData;
+import io.siggi.databackup.util.data.RandomAccessDataFile;
 import io.siggi.databackup.util.Serialization;
 import java.io.Closeable;
 import java.io.File;

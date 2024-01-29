@@ -1,4 +1,4 @@
-package io.siggi.databackup.util;
+package io.siggi.databackup.util.data;
 
 import java.io.Closeable;
 import java.io.IOException;
