@@ -1,5 +1,6 @@
 package io.siggi.databackup.data;
 
+import io.siggi.databackup.util.stream.FilePointer;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.ObjectWriter;
 import io.siggi.databackup.util.data.RandomAccessData;
@@ -45,6 +46,7 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
         return new ReadingIterator<>() {
             @Override
             protected DirectoryEntry read() {
+                long entryOffset = ((FilePointer) in).getFilePointer();
                 DirectoryEntry entry;
                 try {
                     int id = in.read();
@@ -80,6 +82,7 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
                     throw new DirectoryEntryException("IOException occurred", e);
                 }
                 entry.setParent(DirectoryEntryDirectoryDisk.this);
+                entry.setOffset(entryOffset);
                 return entry;
             }
         };

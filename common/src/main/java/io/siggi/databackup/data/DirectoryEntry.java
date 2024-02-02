@@ -10,6 +10,7 @@ public abstract class DirectoryEntry {
     private final String name;
     private final List<ExtraData> extraData = new ArrayList<>();
     private transient DirectoryEntryDirectory parent;
+    private transient long offset;
 
     protected DirectoryEntry(String name) {
         if (name == null) {
@@ -59,6 +60,14 @@ public abstract class DirectoryEntry {
 
     public final void setParent(DirectoryEntryDirectory parent) {
         this.parent = parent;
+    }
+
+    public final long getOffset() {
+        return offset;
+    }
+
+    public final void setOffset(long offset) {
+        this.offset = offset;
     }
 
     public final String getPathOnDisk() {
