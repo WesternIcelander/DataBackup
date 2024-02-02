@@ -47,45 +47,61 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
             @Override
             protected DirectoryEntry read() {
                 long entryOffset = ((FilePointer) in).getFilePointer();
-                DirectoryEntry entry;
-                try {
-                    int id = in.read();
-                    switch (id) {
-                        case Serialization.DIRECTORY_ENTRY_END: {
-                            in.close();
-                            return null;
-                        }
-                        case Serialization.DIRECTORY_ENTRY_NULL: {
-                            String name = IO.readString(in);
-                            entry = new DirectoryEntryNull(name);
-                        }
-                        break;
-                        case Serialization.DIRECTORY_ENTRY_FILE: {
-                            String name = IO.readString(in);
-                            entry = Serialization.deserializeFile(in, data, name);
-                        }
-                        break;
-                        case Serialization.DIRECTORY_ENTRY_DIRECTORY: {
-                            String name = IO.readString(in);
-                            entry = Serialization.deserializeDirectory(in, data, name);
-                        }
-                        break;
-                        case Serialization.DIRECTORY_ENTRY_SYMLINK: {
-                            String name = IO.readString(in);
-                            entry = Serialization.deserializeSymlink(in, name);
-                        }
-                        break;
-                        default:
-                            throw new DirectoryEntryException("Unknown file type " + id);
+                DirectoryEntry entry = readEntry(entryOffset, in);
+                if (entry == null) {
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
                     }
-                } catch (IOException e) {
-                    throw new DirectoryEntryException("IOException occurred", e);
                 }
-                entry.setParent(DirectoryEntryDirectoryDisk.this);
-                entry.setOffset(entryOffset);
                 return entry;
             }
         };
+    }
+
+    public DirectoryEntry readSingleEntry(long offset) throws IOException {
+        try (InputStream in = data.getInputStream(offset)) {
+            return readEntry(offset, in);
+        }
+    }
+
+    private DirectoryEntry readEntry(long offset, InputStream in) {
+        DirectoryEntry entry;
+        try {
+            int id = in.read();
+            switch (id) {
+                case Serialization.DIRECTORY_ENTRY_END: {
+                    return null;
+                }
+                case Serialization.DIRECTORY_ENTRY_NULL: {
+                    String name = IO.readString(in);
+                    entry = new DirectoryEntryNull(name);
+                }
+                break;
+                case Serialization.DIRECTORY_ENTRY_FILE: {
+                    String name = IO.readString(in);
+                    entry = Serialization.deserializeFile(in, data, name);
+                }
+                break;
+                case Serialization.DIRECTORY_ENTRY_DIRECTORY: {
+                    String name = IO.readString(in);
+                    entry = Serialization.deserializeDirectory(in, data, name);
+                }
+                break;
+                case Serialization.DIRECTORY_ENTRY_SYMLINK: {
+                    String name = IO.readString(in);
+                    entry = Serialization.deserializeSymlink(in, name);
+                }
+                break;
+                default:
+                    throw new DirectoryEntryException("Unknown file type " + id);
+            }
+        } catch (IOException e) {
+            throw new DirectoryEntryException("IOException occurred", e);
+        }
+        entry.setParent(DirectoryEntryDirectoryDisk.this);
+        entry.setOffset(offset);
+        return entry;
     }
 
     @Override
