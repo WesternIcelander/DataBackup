@@ -175,6 +175,7 @@ public class StoredData {
 
     public String getCompression() {
         read();
+        if (compression == null) return "none";
         return compression;
     }
 
