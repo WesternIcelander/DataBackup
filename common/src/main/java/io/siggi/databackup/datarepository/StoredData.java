@@ -116,6 +116,11 @@ public class StoredData {
 
     public boolean store(File file, String compression) {
         File originalFile = getFile();
+        String existingCompression = getCompression();
+        if (originalFile.exists() && existingCompression != null && !existingCompression.equals("none")
+                && (compression == null || compression.equals("none"))) {
+            return false;
+        }
         File newFile = repository.getContentFile(contentId, compression);
         getParentDirectory().mkdirs();
         if (!file.renameTo(newFile)) return false;
