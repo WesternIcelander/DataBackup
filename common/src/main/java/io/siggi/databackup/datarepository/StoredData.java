@@ -68,6 +68,7 @@ public class StoredData {
         String keyEq = key + "=";
         File metaFile = getMetadataFile();
         File tmpFile = new File(getMetadataFile().getParentFile(), "tmp-" + UUID.randomUUID());
+        if (!metaFile.exists()) return true;
         try {
             try (FileWriter writer = new FileWriter(tmpFile)) {
                 try (BufferedReader reader = new BufferedReader(new FileReader(metaFile))) {
