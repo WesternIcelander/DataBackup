@@ -1,5 +1,7 @@
 package io.siggi.databackup.datarepository;
 
+import io.siggi.databackup.util.compression.DataCompression;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -25,7 +27,7 @@ public class DataRepository {
     }
 
     File getContentFile(String contentId, String compression) {
-        String suffix = (compression == null || compression.equals("none")) ? "" : ("." + compression);
+        String suffix = (compression == null || compression.equals("none")) ? "" : ("." + DataCompression.getCompressionAlgorithm(compression).fileExtension());
         return new File(root, getPath(contentId) + suffix);
     }
 
