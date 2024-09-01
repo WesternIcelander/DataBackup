@@ -16,7 +16,7 @@ public abstract class FileContent {
 
     private static final List<Class<? extends FileContent>> types = new ArrayList<>();
     private static final List<Supplier<? extends FileContent>> suppliers = new ArrayList<>();
-    static final int TYPE_SHA256 = 0;
+    static final int TYPE_CONTENT_ID = 0;
     static final int TYPE_ZERO_FILLED = 1;
     static final int TYPE_INLINED = 2;
 
@@ -30,7 +30,7 @@ public abstract class FileContent {
     }
 
     static {
-        addContentType(Sha256FileContent.class, Sha256FileContent::new);
+        addContentType(ContentIDFileContent.class, ContentIDFileContent::new);
         addContentType(ZeroFilledFileContent.class, ZeroFilledFileContent::new);
         addContentType(InlinedFileContent.class, InlinedFileContent::new);
     }

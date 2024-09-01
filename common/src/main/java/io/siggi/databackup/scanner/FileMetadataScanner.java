@@ -7,7 +7,7 @@ import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.DirectoryEntryNull;
 import io.siggi.databackup.data.DirectoryEntrySymlink;
 import io.siggi.databackup.data.content.FileContent;
-import io.siggi.databackup.data.content.Sha256FileContent;
+import io.siggi.databackup.data.content.ContentIDFileContent;
 import io.siggi.databackup.data.extra.ExtraDataFilePath;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
@@ -257,10 +257,10 @@ public class FileMetadataScanner {
                     MessageDigestOutputStream out = new MessageDigestOutputStream(sha256);
                     IO.copyInterruptible(in, out, (progress) -> unhashedSize -= progress);
                     byte[] digest = sha256.digest();
-                    Sha256FileContent fileContent = new Sha256FileContent();
+                    ContentIDFileContent fileContent = new ContentIDFileContent();
                     fileContent.setOffset(0L);
                     fileContent.setLength(file.getSize());
-                    System.arraycopy(digest, 0, fileContent.getHash(), 0, 32);
+                    fileContent.setHash(digest);
                     try (ObjectWriter<FileContent> writer = file.updateFileContents()) {
                         writer.write(fileContent);
                     }

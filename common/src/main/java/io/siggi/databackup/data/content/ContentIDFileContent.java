@@ -14,27 +14,36 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 
-public final class Sha256FileContent extends FileContent {
-    private final byte[] hash = new byte[32];
+public final class ContentIDFileContent extends FileContent {
+    private static final byte[] empty = new byte[0];
+    private byte[] hash = empty;
 
     @Override
     public int getTypeId() {
-        return FileContent.TYPE_SHA256;
+        return FileContent.TYPE_CONTENT_ID;
     }
 
     public byte[] getHash() {
         return hash;
     }
 
+    public void setHash(byte[] hash) {
+        if (hash == null) hash = empty;
+        this.hash = hash;
+    }
+
     @Override
     public void read(InputStream in) throws IOException {
         super.read(in);
+        int length = in.read();
+        hash = new byte[length];
         IO.readFully(in, hash);
     }
 
     @Override
     public void write(OutputStream out) throws IOException {
         super.write(out);
+        out.write(hash.length);
         out.write(hash);
     }
 
@@ -72,7 +81,7 @@ public final class Sha256FileContent extends FileContent {
     public boolean equals(Object other) {
         if (!super.equals(other)) return false;
         if (other == this) return true;
-        if (!(other instanceof Sha256FileContent o)) return false;
+        if (!(other instanceof ContentIDFileContent o)) return false;
         return Arrays.equals(hash, o.hash);
     }
 
