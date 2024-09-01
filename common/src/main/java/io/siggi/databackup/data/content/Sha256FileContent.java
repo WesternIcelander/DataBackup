@@ -47,7 +47,7 @@ public final class Sha256FileContent extends FileContent {
         FileInputStream in = null;
         boolean success = false;
         try {
-            StoredData storedData = repository.getStoredData(Util.bytesToHex(getHash()));
+            StoredData storedData = getStoredData(repository);
             File contentFile = storedData.getFile();
             in = new FileInputStream(contentFile);
             CompressionAlgorithm compressionAlgorithm = DataCompression.getCompressionAlgorithm(storedData.getCompression());
@@ -62,6 +62,10 @@ public final class Sha256FileContent extends FileContent {
                 }
             }
         }
+    }
+
+    public StoredData getStoredData(DataRepository repository) {
+        return repository.getStoredData(Util.bytesToHex(getHash()));
     }
 
     @Override

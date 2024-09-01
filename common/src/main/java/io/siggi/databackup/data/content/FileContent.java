@@ -1,6 +1,7 @@
 package io.siggi.databackup.data.content;
 
 import io.siggi.databackup.datarepository.DataRepository;
+import io.siggi.databackup.datarepository.StoredData;
 import io.siggi.databackup.util.stream.IO;
 
 import java.io.IOException;
@@ -86,6 +87,10 @@ public abstract class FileContent {
     }
 
     public abstract InputStream getInputStream(DataRepository repository) throws IOException;
+
+    public StoredData getStoredData(DataRepository repository) {
+        return null;
+    }
 
     @Override
     public boolean equals(Object other) {
