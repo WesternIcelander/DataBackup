@@ -1,5 +1,6 @@
 package io.siggi.databackup.data.content;
 
+import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.util.stream.IO;
 
 import java.io.IOException;
@@ -78,6 +79,10 @@ public abstract class FileContent {
     public void write(OutputStream out) throws IOException {
         IO.writeLong(out, getOffset());
         IO.writeLong(out, getLength());
+    }
+
+    public boolean isDataAvailable(DataRepository repository) {
+        return true;
     }
 
     @Override

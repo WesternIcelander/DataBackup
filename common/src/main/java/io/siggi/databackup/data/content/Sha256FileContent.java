@@ -1,5 +1,7 @@
 package io.siggi.databackup.data.content;
 
+import io.siggi.databackup.datarepository.DataRepository;
+import io.siggi.databackup.datarepository.StoredData;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.Util;
 
@@ -30,6 +32,11 @@ public final class Sha256FileContent extends FileContent {
     public void write(OutputStream out) throws IOException {
         super.write(out);
         out.write(hash);
+    }
+
+    @Override
+    public boolean isDataAvailable(DataRepository repository) {
+        return repository.getStoredData(Util.bytesToHex(getHash())).dataExists();
     }
 
     @Override
