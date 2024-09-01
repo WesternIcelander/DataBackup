@@ -2,9 +2,13 @@ package io.siggi.databackup.data.content;
 
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.datarepository.StoredData;
+import io.siggi.databackup.util.compression.CompressionAlgorithm;
+import io.siggi.databackup.util.compression.DataCompression;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.Util;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -37,6 +41,27 @@ public final class Sha256FileContent extends FileContent {
     @Override
     public boolean isDataAvailable(DataRepository repository) {
         return repository.getStoredData(Util.bytesToHex(getHash())).dataExists();
+    }
+
+    public InputStream getInputStream(DataRepository repository) throws IOException {
+        FileInputStream in = null;
+        boolean success = false;
+        try {
+            StoredData storedData = repository.getStoredData(Util.bytesToHex(getHash()));
+            File contentFile = storedData.getFile();
+            in = new FileInputStream(contentFile);
+            CompressionAlgorithm compressionAlgorithm = DataCompression.getCompressionAlgorithm(storedData.getCompression());
+            InputStream decompressedStream = compressionAlgorithm.decompress(in);
+            success = true;
+            return decompressedStream;
+        } finally {
+            if (!success && in != null) {
+                try {
+                    in.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     @Override

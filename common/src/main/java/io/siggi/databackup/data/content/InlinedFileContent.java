@@ -1,8 +1,10 @@
 package io.siggi.databackup.data.content;
 
+import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.Util;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,6 +46,10 @@ public class InlinedFileContent extends FileContent {
         setLength(data.length);
         super.write(out);
         out.write(data);
+    }
+
+    public InputStream getInputStream(DataRepository repository) {
+        return new ByteArrayInputStream(getData());
     }
 
     @Override

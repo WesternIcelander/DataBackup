@@ -85,6 +85,8 @@ public abstract class FileContent {
         return true;
     }
 
+    public abstract InputStream getInputStream(DataRepository repository) throws IOException;
+
     @Override
     public boolean equals(Object other) {
         if (other == this) return true;

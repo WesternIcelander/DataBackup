@@ -1,10 +1,19 @@
 package io.siggi.databackup.data.content;
 
+import io.siggi.databackup.datarepository.DataRepository;
+import io.siggi.databackup.util.stream.ZeroFilledInputStream;
+
+import java.io.InputStream;
+
 public final class ZeroFilledFileContent extends FileContent {
 
     @Override
     public int getTypeId() {
         return FileContent.TYPE_ZERO_FILLED;
+    }
+
+    public InputStream getInputStream(DataRepository repository) {
+        return new ZeroFilledInputStream(getLength());
     }
 
     @Override
