@@ -178,7 +178,7 @@ public class NtfsDiskUtil implements DiskUtil {
                             NtfsSnapshot snapshot = new NtfsSnapshot(volumeUuid, shadowCopyUuid);
                             List<NtfsSnapshot> ntfsSnapshots = snapshotCache.computeIfAbsent(volumeUuid, u -> new ArrayList<>());
                             ntfsSnapshots.add(snapshot);
-                            snapshotCacheBySnapshotId.put(volumeUuid, snapshot);
+                            snapshotCacheBySnapshotId.put(shadowCopyUuid, snapshot);
                         }
                     } else if (line.contains("Shadow Copy Volume: ")) {
                         String value = line.substring(line.indexOf(": ") + 2).trim();
