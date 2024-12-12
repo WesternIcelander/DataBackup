@@ -60,7 +60,7 @@ public class NtfsDiskUtil implements DiskUtil {
             if (!validateDrive(drive)) {
                 throw new SnapshotException(drive + " is not a valid drive.");
             }
-            if (!new File(drive).exists()) {
+            if (!new File(drive.charAt(0) + ":").exists()) {
                 throw new SnapshotException(drive + " does not exist.");
             }
         }
