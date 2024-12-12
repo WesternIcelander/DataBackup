@@ -99,6 +99,8 @@ public class NtfsDiskUtil implements DiskUtil<NtfsSnapshot> {
                 throw new SnapshotException("Unable to create snapshot, wmic output did not contain ShadowID.");
             }
             return getSnapshot(snapshotUuid);
+        } catch (SnapshotException e) {
+            throw e;
         } catch (Exception e) {
             throw new SnapshotException("Unable to create snapshot.", e);
         }

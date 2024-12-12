@@ -53,6 +53,8 @@ public class BtrfsSnapshot implements Snapshot {
                     path
             });
             if (process.waitFor() != 0) throw new SnapshotException(Util.getErrorString(process));
+        } catch (SnapshotException e) {
+            throw e;
         } catch (Exception e) {
             throw new SnapshotException("Unable to delete snapshot.", e);
         }

@@ -78,6 +78,8 @@ public class BtrfsDiskUtil implements DiskUtil<BtrfsSnapshot> {
             });
             if (process.waitFor() != 0) throw new SnapshotException(Util.getErrorString(process));
             return new BtrfsSnapshot(target);
+        } catch (SnapshotException e) {
+            throw e;
         } catch (Exception e) {
             throw new SnapshotException("Unable to create snapshot.", e);
         }

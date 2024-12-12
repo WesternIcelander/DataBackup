@@ -92,6 +92,8 @@ public class ApfsSnapshot implements Snapshot {
             });
             if (process.waitFor() != 0) throw new SnapshotException(Util.getErrorString(process));
             return mountedPath;
+        } catch (SnapshotException e) {
+            throw e;
         } catch (Exception e) {
             mountedPathFile.delete();
             throw new SnapshotException("Unable to mount snapshot", e);
@@ -106,6 +108,8 @@ public class ApfsSnapshot implements Snapshot {
             Process process = Runtime.getRuntime().exec(new String[]{"umount", mountedPath});
             if (process.waitFor() != 0) throw new SnapshotException(Util.getErrorString(process));
             new File(mountedPath).delete();
+        } catch (SnapshotException e) {
+            throw e;
         } catch (Exception e) {
             throw new SnapshotException("Unable to unmount snapshot", e);
         }
@@ -117,6 +121,8 @@ public class ApfsSnapshot implements Snapshot {
             Process process = Runtime.getRuntime().exec(new String[]{"/usr/sbin/diskutil", "ap", "deleteSnapshot", device(), "-xid", Long.toString(xid())});
             if (process.waitFor() != 0) throw new SnapshotException(Util.getErrorString(process));
             ApfsDiskUtil.invalidateSnapshotCache(0L);
+        } catch (SnapshotException e) {
+            throw e;
         } catch (Exception e) {
             throw new SnapshotException("Unable to delete snapshot.", e);
         }
