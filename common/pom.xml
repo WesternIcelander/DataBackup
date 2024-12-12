@@ -24,6 +24,11 @@
     <dependencies>
         <dependency>
             <groupId>io.siggi</groupId>
+            <artifactId>SiggiTools</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.siggi</groupId>
             <artifactId>Stat</artifactId>
             <version>1.0</version>
         </dependency>
