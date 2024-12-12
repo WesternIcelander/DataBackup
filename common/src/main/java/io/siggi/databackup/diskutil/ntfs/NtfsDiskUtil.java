@@ -65,9 +65,19 @@ public class NtfsDiskUtil implements DiskUtil {
             }
         }
         Map<String, Snapshot> snapshots = new HashMap<>();
-        for (String drive : drives) {
-            String drivePath = drive.substring(0, 1).toUpperCase() + ":\\";
-            snapshots.put(drive, createSnapshot(drivePath));
+        try {
+            for (String drive : drives) {
+                String drivePath = drive.substring(0, 1).toUpperCase() + ":\\";
+                snapshots.put(drive, createSnapshot(drivePath));
+            }
+        } catch (SnapshotException e) {
+            for (Snapshot snapshot : snapshots.values()) {
+                try {
+                    snapshot.delete();
+                } catch (SnapshotException e2) {
+                }
+            }
+            throw e;
         }
         return snapshots;
     }
