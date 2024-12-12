@@ -4,10 +4,10 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.function.Function;
 
-public interface DiskUtil<S extends Snapshot> {
+public interface DiskUtil {
     String filesystem();
-    SnapshotSerializer<S> serializer();
+    SnapshotSerializer serializer();
     boolean supportsSnapshots();
     boolean snapshotsRequireDestination();
-    Map<String,S> createSnapshots(Collection<String> filesystems, Function<String,String> destination) throws SnapshotException;
+    Map<String, Snapshot> createSnapshots(Collection<String> filesystems, Function<String,String> destination) throws SnapshotException;
 }

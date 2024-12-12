@@ -16,7 +16,7 @@ public class BtrfsSnapshot implements Snapshot {
     }
 
     @Override
-    public DiskUtil<?> diskUtil() {
+    public DiskUtil diskUtil() {
         return BtrfsDiskUtil.get();
     }
 

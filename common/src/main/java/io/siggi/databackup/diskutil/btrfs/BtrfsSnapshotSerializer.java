@@ -1,9 +1,10 @@
 package io.siggi.databackup.diskutil.btrfs;
 
 import com.google.gson.JsonObject;
+import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotSerializer;
 
-public class BtrfsSnapshotSerializer implements SnapshotSerializer<BtrfsSnapshot> {
+public class BtrfsSnapshotSerializer implements SnapshotSerializer {
     private BtrfsSnapshotSerializer() {
     }
 
@@ -21,9 +22,10 @@ public class BtrfsSnapshotSerializer implements SnapshotSerializer<BtrfsSnapshot
     }
 
     @Override
-    public JsonObject serialize(BtrfsSnapshot snapshot) {
+    public JsonObject serialize(Snapshot snapshot) {
+        if (!(snapshot instanceof BtrfsSnapshot btrfsSnapshot)) throw new IllegalArgumentException("Snapshot to serialize is not a BtrfsSnapshot.");
         JsonObject object = new JsonObject();
-        object.addProperty("path", snapshot.path());
+        object.addProperty("path", btrfsSnapshot.path());
         return object;
     }
 }

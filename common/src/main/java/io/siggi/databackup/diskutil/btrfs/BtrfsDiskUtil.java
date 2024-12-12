@@ -1,6 +1,7 @@
 package io.siggi.databackup.diskutil.btrfs;
 
 import io.siggi.databackup.diskutil.DiskUtil;
+import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.diskutil.apfs.ApfsSnapshotSerializer;
 import io.siggi.databackup.util.Util;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-public class BtrfsDiskUtil implements DiskUtil<BtrfsSnapshot> {
+public class BtrfsDiskUtil implements DiskUtil {
 
     static final String BTRFS_PATH = "/usr/bin/btrfs";
 
@@ -46,8 +47,8 @@ public class BtrfsDiskUtil implements DiskUtil<BtrfsSnapshot> {
     }
 
     @Override
-    public Map<String, BtrfsSnapshot> createSnapshots(Collection<String> filesystems, Function<String, String> destination) throws SnapshotException {
-        Map<String,BtrfsSnapshot> snapshots = new HashMap<>();
+    public Map<String, Snapshot> createSnapshots(Collection<String> filesystems, Function<String, String> destination) throws SnapshotException {
+        Map<String,Snapshot> snapshots = new HashMap<>();
         try {
             for (String path : filesystems) {
                 String dest = destination.apply(path);
@@ -55,7 +56,7 @@ public class BtrfsDiskUtil implements DiskUtil<BtrfsSnapshot> {
                 snapshots.put(path, snapshot);
             }
         } catch (SnapshotException e) {
-            for (BtrfsSnapshot snapshot : snapshots.values()) {
+            for (Snapshot snapshot : snapshots.values()) {
                 try {
                     snapshot.delete();
                 } catch (SnapshotException e2) {

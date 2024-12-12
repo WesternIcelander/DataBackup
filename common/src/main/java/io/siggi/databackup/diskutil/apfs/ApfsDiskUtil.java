@@ -1,6 +1,7 @@
 package io.siggi.databackup.diskutil.apfs;
 
 import io.siggi.databackup.diskutil.DiskUtil;
+import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.diskutil.MountedDisk;
 
@@ -17,7 +18,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class ApfsDiskUtil implements DiskUtil<ApfsSnapshot> {
+public class ApfsDiskUtil implements DiskUtil {
 
     private ApfsDiskUtil() {
     }
@@ -49,13 +50,13 @@ public class ApfsDiskUtil implements DiskUtil<ApfsSnapshot> {
     }
 
     @Override
-    public Map<String, ApfsSnapshot> createSnapshots(Collection<String> filesystems, Function<String, String> destination) throws SnapshotException {
+    public Map<String, Snapshot> createSnapshots(Collection<String> filesystems, Function<String, String> destination) throws SnapshotException {
         updateUuidMappings();
         String snapshotTime = localSnapshot();
         if (snapshotTime == null) {
             throw new SnapshotException("Unable to perform a local snapshot.");
         }
-        Map<String, ApfsSnapshot> resultMap = new HashMap<>();
+        Map<String, Snapshot> resultMap = new HashMap<>();
         List<MountedDisk> mountedDisks = MountedDisk.getAll();
         List<ApfsSnapshot> toDelete = new ArrayList<>();
         for (MountedDisk disk : mountedDisks) {

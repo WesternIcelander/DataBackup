@@ -1,11 +1,12 @@
 package io.siggi.databackup.diskutil.ntfs;
 
 import com.google.gson.JsonObject;
+import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotSerializer;
 
 import java.util.UUID;
 
-public class NtfsSnapshotSerializer implements SnapshotSerializer<NtfsSnapshot> {
+public class NtfsSnapshotSerializer implements SnapshotSerializer {
     private NtfsSnapshotSerializer() {
     }
 
@@ -24,10 +25,11 @@ public class NtfsSnapshotSerializer implements SnapshotSerializer<NtfsSnapshot> 
     }
 
     @Override
-    public JsonObject serialize(NtfsSnapshot snapshot) {
+    public JsonObject serialize(Snapshot snapshot) {
+        if (!(snapshot instanceof NtfsSnapshot ntfsSnapshot)) throw new IllegalArgumentException("Snapshot to serialize is not an NtfsSnapshot.");
         JsonObject object = new JsonObject();
-        object.addProperty("volumeId", snapshot.volumeId().toString());
-        object.addProperty("shadowCopyId", snapshot.shadowCopyId().toString());
+        object.addProperty("volumeId", ntfsSnapshot.volumeId().toString());
+        object.addProperty("shadowCopyId", ntfsSnapshot.shadowCopyId().toString());
         return object;
     }
 }

@@ -48,7 +48,7 @@ public class ApfsSnapshot implements Snapshot {
     }
 
     @Override
-    public DiskUtil<?> diskUtil() {
+    public DiskUtil diskUtil() {
         return ApfsDiskUtil.get();
     }
 

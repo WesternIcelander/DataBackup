@@ -28,7 +28,7 @@ public class NtfsSnapshot implements Snapshot {
     }
 
     @Override
-    public DiskUtil<?> diskUtil() {
+    public DiskUtil diskUtil() {
         return NtfsDiskUtil.get();
     }
 

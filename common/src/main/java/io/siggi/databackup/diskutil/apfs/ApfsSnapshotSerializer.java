@@ -1,11 +1,12 @@
 package io.siggi.databackup.diskutil.apfs;
 
 import com.google.gson.JsonObject;
+import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotSerializer;
 
 import java.util.UUID;
 
-public class ApfsSnapshotSerializer implements SnapshotSerializer<ApfsSnapshot> {
+public class ApfsSnapshotSerializer implements SnapshotSerializer {
     private ApfsSnapshotSerializer() {
     }
 
@@ -26,12 +27,13 @@ public class ApfsSnapshotSerializer implements SnapshotSerializer<ApfsSnapshot> 
     }
 
     @Override
-    public JsonObject serialize(ApfsSnapshot snapshot) {
+    public JsonObject serialize(Snapshot snapshot) {
+        if (!(snapshot instanceof ApfsSnapshot apfsSnapshot)) throw new IllegalArgumentException("Snapshot to serialize is not an ApfsSnapshot.");
         JsonObject object = new JsonObject();
-        object.addProperty("volumeUuid", snapshot.volumeUuid().toString());
-        object.addProperty("snapshotUuid", snapshot.snapshotUuid().toString());
-        object.addProperty("name", snapshot.name());
-        object.addProperty("xid", snapshot.xid());
+        object.addProperty("volumeUuid", apfsSnapshot.volumeUuid().toString());
+        object.addProperty("snapshotUuid", apfsSnapshot.snapshotUuid().toString());
+        object.addProperty("name", apfsSnapshot.name());
+        object.addProperty("xid", apfsSnapshot.xid());
         return object;
     }
 }

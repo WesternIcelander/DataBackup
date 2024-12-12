@@ -1,6 +1,7 @@
 package io.siggi.databackup.diskutil.ntfs;
 
 import io.siggi.databackup.diskutil.DiskUtil;
+import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.diskutil.btrfs.BtrfsSnapshotSerializer;
 import io.siggi.databackup.util.Util;
@@ -19,7 +20,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class NtfsDiskUtil implements DiskUtil<NtfsSnapshot> {
+public class NtfsDiskUtil implements DiskUtil {
 
     static final String WMIC_PATH = "C:\\Windows\\System32\\wbem\\WMIC.exe";
     static final String VSSADMIN_PATH = "C:\\Windows\\System32\\vssadmin.exe";
@@ -54,7 +55,7 @@ public class NtfsDiskUtil implements DiskUtil<NtfsSnapshot> {
     }
 
     @Override
-    public Map<String, NtfsSnapshot> createSnapshots(Collection<String> drives, Function<String, String> destination) throws SnapshotException {
+    public Map<String, Snapshot> createSnapshots(Collection<String> drives, Function<String, String> destination) throws SnapshotException {
         for (String drive : drives) {
             if (!validateDrive(drive)) {
                 throw new SnapshotException(drive + " is not a valid drive.");
@@ -63,7 +64,7 @@ public class NtfsDiskUtil implements DiskUtil<NtfsSnapshot> {
                 throw new SnapshotException(drive + " does not exist.");
             }
         }
-        Map<String, NtfsSnapshot> snapshots = new HashMap<>();
+        Map<String, Snapshot> snapshots = new HashMap<>();
         for (String drive : drives) {
             String drivePath = drive.substring(0, 1).toUpperCase() + ":\\";
             snapshots.put(drive, createSnapshot(drivePath));
