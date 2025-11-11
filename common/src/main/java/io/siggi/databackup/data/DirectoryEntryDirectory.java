@@ -47,4 +47,7 @@ public abstract class DirectoryEntryDirectory extends DirectoryEntry implements 
     public void setDirectoryOffsetOffset(long newOffset) {
         this.offsetOffset = newOffset;
     }
+
+    @Override
+    public abstract DirectoryEntryDirectory copy();
 }

@@ -41,6 +41,16 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
         this.size = size;
     }
 
+    @Override
+    public DirectoryEntryFile copy() {
+        DirectoryEntryFile entry = new DirectoryEntryFile(getName(), fileContents, contentOffset, contentOffsetOffset, data, lastModified, size);
+        entry.fileContentsReference = fileContentsReference;
+        entry.setParent(getParent());
+        entry.getExtra().addAll(getExtra());
+        entry.setOffset(getOffset());
+        return entry;
+    }
+
     public Iterator<FileContent> iterator() {
         if (fileContents != null) return fileContents.iterator();
         if (fileContentsReference != null) {

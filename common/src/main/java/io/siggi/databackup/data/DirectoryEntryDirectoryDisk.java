@@ -28,6 +28,15 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
     }
 
     @Override
+    public DirectoryEntryDirectoryDisk copy() {
+        DirectoryEntryDirectoryDisk entry = new DirectoryEntryDirectoryDisk(data, getName(), offset, getDirectoryOffsetOffset());
+        entry.setParent(getParent());
+        entry.getExtra().addAll(getExtra());
+        entry.setOffset(getOffset());
+        return entry;
+    }
+
+    @Override
     public DirectoryEntry getEntry(String name) {
         return getEntries().get(name);
     }

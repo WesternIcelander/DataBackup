@@ -37,6 +37,8 @@ public abstract class DirectoryEntry {
 
     public abstract DirectoryEntryType getType();
 
+    public abstract DirectoryEntry copy();
+
     public final String getName() {
         return name;
     }

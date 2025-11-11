@@ -16,6 +16,16 @@ public class DirectoryEntryDirectoryMemory extends DirectoryEntryDirectory {
     }
 
     @Override
+    public DirectoryEntryDirectoryMemory copy() {
+        DirectoryEntryDirectoryMemory entry = new DirectoryEntryDirectoryMemory(getName());
+        entry.entries.putAll(entries);
+        entry.setParent(getParent());
+        entry.getExtra().addAll(getExtra());
+        entry.setOffset(getOffset());
+        return entry;
+    }
+
+    @Override
     public DirectoryEntry getEntry(String name) {
         return getEntries().get(name);
     }

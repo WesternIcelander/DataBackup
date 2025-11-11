@@ -18,6 +18,11 @@ public class DirectoryEntryDirectoryMerge extends DirectoryEntryDirectory {
     }
 
     @Override
+    public DirectoryEntryDirectoryMerge copy() {
+        return new DirectoryEntryDirectoryMerge(base, mergeIn);
+    }
+
+    @Override
     public DirectoryEntry getEntry(String name) {
         return getEntries().get(name);
     }
