@@ -1,14 +1,14 @@
 package io.siggi.databackup.data;
 
 import io.siggi.databackup.data.extra.ExtraDataDiffMetadata;
+import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Map;
 
 public class DirectoryEntryDirectoryMerge extends DirectoryEntryDirectory {
     private final DirectoryEntryDirectory base;
     private final DirectoryEntryDirectory mergeIn;
-    private boolean didCopyEntries = false;
-    private final Map<String,DirectoryEntry> entries = new HashMap<>();
+    private SoftReference<Map<String,DirectoryEntry>> entries = null;
     public DirectoryEntryDirectoryMerge(DirectoryEntryDirectory base, DirectoryEntryDirectory mergeIn) {
         super(mergeIn.getName());
         this.base = base;
@@ -24,29 +24,30 @@ public class DirectoryEntryDirectoryMerge extends DirectoryEntryDirectory {
 
     @Override
     public Map<String, DirectoryEntry> getEntries() {
-        if (!didCopyEntries) {
-            didCopyEntries = true;
-            entries.putAll(base.getEntries());
+        Map<String,DirectoryEntry> entryMap = entries == null ? null : entries.get();
+        if (entryMap == null) {
+            entries = new SoftReference<>(entryMap = new HashMap<>());
+            entryMap.putAll(base.getEntries());
             for (Map.Entry<String,DirectoryEntry> mapEntry : mergeIn.getEntries().entrySet()) {
                 String key = mapEntry.getKey();
                 DirectoryEntry entry = mapEntry.getValue();
                 if (entry.isNull()) {
-                    entries.remove(key);
+                    entryMap.remove(key);
                 } else if (entry.isDirectory()) {
-                    DirectoryEntry baseEntry = entries.get(key);
+                    DirectoryEntry baseEntry = entryMap.get(key);
                     if (baseEntry == null || !baseEntry.isDirectory()) {
-                        entries.put(key, entry);
+                        entryMap.put(key, entry);
                         continue;
                     }
                     DirectoryEntryDirectoryMerge subDirectory = new DirectoryEntryDirectoryMerge(baseEntry.asDirectory(), entry.asDirectory());
                     subDirectory.setParent(this);
-                    entries.put(key, subDirectory);
+                    entryMap.put(key, subDirectory);
                 } else {
                     entry.setParent(this);
-                    entries.put(key, entry);
+                    entryMap.put(key, entry);
                 }
             }
         }
-        return entries;
+        return entryMap;
     }
 }
