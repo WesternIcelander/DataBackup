@@ -211,12 +211,14 @@ public class FileMetadataScanner {
             throw new InterruptedException();
         }
         Map<String, DirectoryEntry> fromEntries = from.getEntries();
+        List<DirectoryEntryDirectory> directoryEntries = new LinkedList<>();
         for (DirectoryEntry toValue : to) {
             String name = toValue.getName();
             DirectoryEntry fromValue = fromEntries.get(name);
             if (fromValue == null) continue;
             if (fromValue.isDirectory() && toValue.isDirectory()) {
-                copyHashes(fromValue.asDirectory(), toValue.asDirectory());
+                directoryEntries.add(fromValue.asDirectory());
+                directoryEntries.add(toValue.asDirectory());
             } else if (fromValue.isFile() && toValue.isFile()) {
                 DirectoryEntryFile fromFile = fromValue.asFile();
                 DirectoryEntryFile toFile = toValue.asFile();
@@ -233,6 +235,11 @@ public class FileMetadataScanner {
                     }
                 }
             }
+        }
+        while (directoryEntries.size() >= 2) {
+            DirectoryEntryDirectory fromDirectory = directoryEntries.remove(0);
+            DirectoryEntryDirectory toDirectory = directoryEntries.remove(0);
+            copyHashes(fromDirectory, toDirectory);
         }
     }
 
