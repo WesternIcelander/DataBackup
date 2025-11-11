@@ -212,7 +212,7 @@ public class FileMetadataScanner {
         }
         Map<String, DirectoryEntry> fromEntries = from.getEntries();
         for (DirectoryEntry toValue : to) {
-            String name = to.getName();
+            String name = toValue.getName();
             DirectoryEntry fromValue = fromEntries.get(name);
             if (fromValue == null) continue;
             if (fromValue.isDirectory() && toValue.isDirectory()) {
