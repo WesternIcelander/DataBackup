@@ -48,8 +48,9 @@ public class DirectoryEntryDirectoryMerge extends DirectoryEntryDirectory {
                     subDirectory.setParent(this);
                     entryMap.put(key, subDirectory);
                 } else {
-                    entry.setParent(this);
-                    entryMap.put(key, entry);
+                    DirectoryEntry newEntry = entry.copy();
+                    newEntry.setParent(this);
+                    entryMap.put(key, newEntry);
                 }
             }
         }
