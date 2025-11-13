@@ -53,6 +53,13 @@ public class DirectoryEntryDirectoryMerge extends DirectoryEntryDirectory {
                     entryMap.put(key, newEntry);
                 }
             }
+            entryMap.replaceAll((key, entry) -> {
+                if (entry.getParent() != this) {
+                    entry = entry.copy();
+                    entry.setParent(this);
+                }
+                return entry;
+            });
         }
         return entryMap;
     }
