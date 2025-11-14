@@ -12,6 +12,15 @@ public class DirectoryEntrySymlink extends DirectoryEntry {
     }
 
     @Override
+    public DirectoryEntrySymlink copy() {
+        DirectoryEntrySymlink entry = new DirectoryEntrySymlink(getName(), getTarget());
+        entry.setParent(getParent());
+        entry.getExtra().addAll(getExtra());
+        entry.setOffset(getOffset());
+        return entry;
+    }
+
+    @Override
     public final boolean isSymlink() {
         return true;
     }
