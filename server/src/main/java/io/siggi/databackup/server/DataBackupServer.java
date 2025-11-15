@@ -257,7 +257,7 @@ public class DataBackupServer {
                             if (fileContents.size() == 1) {
                                 FileContent fileContent = fileContents.get(0);
                                 StoredData storedData = fileContent.getStoredData(dataRepository);
-                                if (storedData != null) {
+                                if (storedData != null && storedData.dataExists()) {
                                     returnStoredData(request, storedData);
                                     return;
                                 }
