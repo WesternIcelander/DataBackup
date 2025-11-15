@@ -2,6 +2,7 @@ package io.siggi.databackup.util.stream;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 
 public class ZeroFilledInputStream extends InputStream {
     private long remaining = 0L;
@@ -30,10 +31,7 @@ public class ZeroFilledInputStream extends InputStream {
             length = (int) remaining;
         }
         remaining -= length;
-        int end = offset + length;
-        for (int i = offset; i < end; i++) {
-            buffer[i] = (byte) 0;
-        }
+        Arrays.fill(buffer, offset, offset + length, (byte) 0);
         return length;
     }
 
