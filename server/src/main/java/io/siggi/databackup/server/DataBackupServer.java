@@ -13,6 +13,7 @@ import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.datarepository.StoredData;
+import io.siggi.databackup.osutils.OS;
 import io.siggi.databackup.util.TimeUtil;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.http.HTTPRequest;
@@ -85,13 +86,11 @@ public class DataBackupServer {
         } else {
             dataRoot = new File("databackup");
             if (!dataRoot.exists()) {
-                if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                    dataRoot = new File("C:\\ProgramData\\DataBackup");
-                } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
-                    dataRoot = new File("/Library/Application Support/DataBackup");
-                } else {
-                    dataRoot = new File("/var/lib/databackup");
-                }
+                dataRoot = switch (OS.get()) {
+                    case WINDOWS -> new File("C:\\ProgramData\\DataBackup");
+                    case MACOS -> new File("/Library/Application Support/DataBackup");
+                    default -> new File("/var/lib/databackup");
+                };
             }
         }
         if (!dataRoot.exists() && !dataRoot.mkdirs()) {
