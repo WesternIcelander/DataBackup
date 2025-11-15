@@ -270,6 +270,17 @@ public class DataBackupServer {
                                     allDataAvailable = false;
                                 }
                             }
+                            if (allDataAvailable) {
+                                request.response.setContentType("application/x-octet-stream");
+                                request.response.contentLength(totalSize);
+                                for (FileContent content : fileContents) {
+                                    try (InputStream in = content.getInputStream(dataRepository)) {
+                                        IO.copy(in, request.response, null);
+                                    }
+                                }
+                                return;
+                            }
+                            // TODO: output an error message
                         }
                     }
                 }
