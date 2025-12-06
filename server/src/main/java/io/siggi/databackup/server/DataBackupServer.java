@@ -297,6 +297,8 @@ public class DataBackupServer {
             if (lastDot != -1) {
                 String extension = knownName.substring(lastDot + 1);
                 knownMime = httpServer.getMimeType(extension);
+                // never send text/html as it may result in unwanted clientside code execution
+                if (knownMime.startsWith("text/html")) knownMime = null;
             }
         }
         String compression = storedData.getCompression();
