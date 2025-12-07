@@ -61,7 +61,9 @@ public class ApfsDiskUtil implements DiskUtil {
         List<ApfsSnapshot> toDelete = new ArrayList<>();
         for (MountedDisk disk : mountedDisks) {
             if (disk.isReadOnly() || !disk.type().equals("apfs")) continue;
-            List<ApfsSnapshot> apfsSnapshots = listSnapshots(uuidForDevice(disk.dev()), disk.dev());
+            UUID deviceUuid = uuidForDevice(disk.dev());
+            if (deviceUuid == null) continue;
+            List<ApfsSnapshot> apfsSnapshots = listSnapshots(deviceUuid, disk.dev());
 
             String matchedItem;
             if (filesystems.contains(disk.dev())) matchedItem = disk.dev();
