@@ -64,4 +64,14 @@ public class BtrfsSnapshot implements Snapshot {
     public boolean isValid() throws SnapshotException {
         return new File(mountedPath()).exists();
     }
+
+    private String toString;
+
+    @Override
+    public String toString() {
+        if (toString == null) {
+            toString = "BtrfsSnapshot{path=" + path + "}";
+        }
+        return toString;
+    }
 }

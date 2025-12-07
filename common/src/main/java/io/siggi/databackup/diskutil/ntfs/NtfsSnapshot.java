@@ -76,4 +76,14 @@ public class NtfsSnapshot implements Snapshot {
     public boolean isValid() throws SnapshotException {
         return NtfsDiskUtil.getSnapshot(shadowCopyId) != null;
     }
+
+    private String toString;
+
+    @Override
+    public String toString() {
+        if (toString == null) {
+            toString = "NtfsSnapshot{volumeId=" + volumeId + ",shadowCopyId=" + shadowCopyId + "}";
+        }
+        return toString;
+    }
 }

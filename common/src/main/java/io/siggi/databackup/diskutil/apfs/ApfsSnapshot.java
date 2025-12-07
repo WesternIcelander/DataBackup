@@ -139,4 +139,14 @@ public class ApfsSnapshot implements Snapshot {
         }
         return false;
     }
+
+    private String toString;
+
+    @Override
+    public String toString() {
+        if (toString == null) {
+            toString = "ApfsSnapshot{volumeUuid=" + volumeUuid + ",snapshotUuid=" + snapshotUuid + ",name=" + name + ",xid=" + xid + "}";
+        }
+        return toString;
+    }
 }
