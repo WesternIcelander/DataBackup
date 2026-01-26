@@ -70,6 +70,7 @@ public class DataBackupServer {
         this.serverSocket = new ServerSocket();
         serverSocket.bind(listenerAddress);
         this.httpServer.responderRegistry.register("/", this::respond, true, true);
+        this.httpServer.setIgnoringMultipartFormData(true);
         this.authorizer = new SimpleAuthorizer(new File(root, "tokens"));
     }
 
