@@ -7,6 +7,7 @@ import io.siggi.databackup.util.stream.LimitedInputStream;
 import io.siggi.databackup.util.stream.MessageDigestOutputStream;
 import io.siggi.databackup.util.stream.TeeOutputStream;
 import io.siggi.http.HTTPRequest;
+import io.siggi.http.io.MultipartFormDataParser;
 
 import java.io.EOFException;
 import java.io.File;
@@ -29,27 +30,19 @@ public class ContentReceiver {
 
     public void handle(HTTPRequest request) throws IOException, InterruptedException {
         List<String> allItems = new LinkedList<>();
-        InputStream in = request.inStream;
-        while (true) {
+        MultipartFormDataParser parser = new MultipartFormDataParser(request.inStream, request.getHeader("Content-Type"), 1024);
+        MultipartFormDataParser.Part part;
+        while ((part = parser.nextPart()) != null) {
+            if (!part.isFile()) continue;
             File tmpFile = null;
             try {
-                long fileLength;
-                try {
-                    fileLength = IO.readLong(in);
-                } catch (EOFException e) {
-                    break;
-                }
-                if (fileLength == 0L) break;
                 tmpFile = new File(tmpDir, UUID.randomUUID().toString());
-                InputStream fileIn = new LimitedInputStream(in, fileLength, false);
+                InputStream fileIn = part.getInputStream();
                 MessageDigest sha256 = Util.sha256();
                 MessageDigestOutputStream digestOut = new MessageDigestOutputStream(sha256);
                 try (FileOutputStream out = new FileOutputStream(tmpFile)) {
                     TeeOutputStream teeOut = new TeeOutputStream(out, digestOut);
                     IO.copyInterruptible(fileIn, teeOut, null);
-                }
-                if (tmpFile.length() != fileLength) {
-                    break;
                 }
                 byte[] digest = sha256.digest();
                 String contentId = Util.bytesToHex(digest);

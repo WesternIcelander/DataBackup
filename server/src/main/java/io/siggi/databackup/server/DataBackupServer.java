@@ -149,8 +149,8 @@ public class DataBackupServer {
         if (auth == null) {
             return;
         }
-        if (request.url.equals("/content")) {
-            if (!request.method.equals("PUT")) return;
+        if (request.url.equals("/upload")) {
+            if (!request.method.equals("POST")) return;
             if (!auth.checkPermission("upload")) return;
             this.contentReceiver.handle(request);
         } else if (request.url.startsWith("/content/")) {
