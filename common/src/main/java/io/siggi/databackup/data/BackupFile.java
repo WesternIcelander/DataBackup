@@ -20,6 +20,7 @@ public class BackupFile implements Closeable {
 
     private final RandomAccessFile raf;
     private final RandomAccessData data;
+    private final boolean closeDataOnClose;
     private final DirectoryEntryDirectoryDisk rootDirectory;
 
     public static BackupFile open(File file) throws IOException {
@@ -31,7 +32,7 @@ public class BackupFile implements Closeable {
         RandomAccessFile raf = null;
         try {
             raf = new RandomAccessFile(file, allowWriting ? "rw" : "r");
-            BackupFile backupFile = new BackupFile(raf, new RandomAccessDataFile(raf, allowWriting));
+            BackupFile backupFile = new BackupFile(raf, new RandomAccessDataFile(raf, allowWriting), false);
             success = true;
             return backupFile;
         } finally {
@@ -44,13 +45,14 @@ public class BackupFile implements Closeable {
         }
     }
 
-    public static BackupFile open(RandomAccessData data) throws IOException {
-        return new BackupFile(null, data);
+    public static BackupFile open(RandomAccessData data, boolean closeDataOnClose) throws IOException {
+        return new BackupFile(null, data, closeDataOnClose);
     }
 
-    private BackupFile(RandomAccessFile raf, RandomAccessData data) throws IOException {
+    private BackupFile(RandomAccessFile raf, RandomAccessData data, boolean closeDataOnClose) throws IOException {
         this.raf = raf;
         this.data = data;
+        this.closeDataOnClose = closeDataOnClose;
         InputStream in = data.getInputStream(0L);
         if (!Arrays.equals(IO.readBytes(in, magicHeader.length), magicHeader)) {
             throw new IllegalArgumentException("Not a backup file");
@@ -74,9 +76,26 @@ public class BackupFile implements Closeable {
 
     @Override
     public void close() throws IOException {
+        IOException ioe = null;
         if (raf != null) {
-            raf.close();
+            try {
+                raf.close();
+            } catch (IOException e) {
+                ioe = e;
+            }
         }
+        if (closeDataOnClose) {
+            try {
+                data.close();
+            } catch (IOException e) {
+                if (ioe != null) {
+                    ioe.addSuppressed(e);
+                } else {
+                    ioe = e;
+                }
+            }
+        }
+        if (ioe != null) throw ioe;
     }
 
     public static void writeToFile(File file, DirectoryEntryDirectory rootDirectory) throws IOException {
