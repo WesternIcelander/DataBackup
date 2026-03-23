@@ -4,8 +4,8 @@ import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.ObjectWriter;
-import io.siggi.databackup.util.data.RandomAccessData;
 import io.siggi.databackup.util.ReadingIterator;
+import io.siggi.tools.io.RandomAccessData;
 
 import java.io.IOException;
 import java.io.InputStream;

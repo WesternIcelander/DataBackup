@@ -8,10 +8,10 @@ import io.siggi.databackup.data.DirectoryEntryNull;
 import io.siggi.databackup.data.DirectoryEntrySymlink;
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraData;
-import io.siggi.databackup.util.data.RandomAccessData;
 import io.siggi.databackup.util.stream.FilePointer;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.stream.RafOutputStream;
+import io.siggi.tools.io.RandomAccessData;
 
 import java.io.IOException;
 import java.io.InputStream;
