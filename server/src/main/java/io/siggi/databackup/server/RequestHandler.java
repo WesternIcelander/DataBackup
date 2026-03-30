@@ -24,8 +24,9 @@ import java.util.zip.GZIPInputStream;
 
 public class RequestHandler implements HTTPResponder {
 
-    RequestHandler(DataBackupServer server) {
+    RequestHandler(DataBackupServer server, Authorizer authorizer) {
         this.server = server;
+        setAuthorizer(authorizer);
     }
 
     private final DataBackupServer server;

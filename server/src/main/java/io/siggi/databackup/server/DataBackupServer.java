@@ -45,9 +45,9 @@ public class DataBackupServer {
         this.httpServer = new HTTPServerBuilder().build();
         this.serverSocket = new ServerSocket();
         serverSocket.bind(listenerAddress);
-        this.httpServer.responderRegistry.register("/", this.requestHandler = new RequestHandler(this));
+        this.requestHandler = new RequestHandler(this, new SimpleAuthorizer(new File(root, "tokens")));
+        this.httpServer.responderRegistry.register("/", this.requestHandler);
         this.httpServer.setIgnoringMultipartFormData(true);
-        this.requestHandler.setAuthorizer(new SimpleAuthorizer(new File(root, "tokens")));
     }
 
     public static void main(String[] args) throws Exception {
