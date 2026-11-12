@@ -506,7 +506,13 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 4: Web UI
 
-- [ ] **Add the read-only web UI**
+- [x] **Add the read-only web UI**
+  - Done: `1cadd73` (2026-11-12). New `server/.../WebUi` (dispatched from `RequestHandler.route` before the token
+    check): `/ui/login` (form POST `token`; cookie value percent-encoded, session cookie, `Path=/`), `/ui/logout`
+    (GET or POST), `/ui/`, `/ui/backups/:m/[:b/[path/]]`; a file's UI path redirects to its download route. CSS is
+    served from `/ui/style.css` so the CSP (`default-src 'self'` plus `base-uri`/`form-action`/`frame-ancestors`)
+    needs no `'unsafe-inline'`. Times show in UTC. `/` still gives `404`. Tests: `server` `WebUiTest`; documented in
+    `docs/server-api.md`.
   - Server-rendered HTML under `/ui/`:
     - A login page that takes a token and sets an `HttpOnly`, `SameSite=Strict` `token` cookie (plus `Secure` when
       the request came through HTTPS).
