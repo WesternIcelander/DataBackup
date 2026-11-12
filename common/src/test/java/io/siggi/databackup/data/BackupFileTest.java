@@ -258,6 +258,150 @@ class BackupFileTest {
         }
     }
 
+    @Test
+    void writingAnOpenedTreeLeavesItUnchanged() throws IOException {
+        File copy = new File(tempDir, "copy");
+        long originalLength = file.length();
+        try (BackupFile backupFile = BackupFile.open(file, true)) {
+            DirectoryEntryDirectory root = backupFile.getRootDirectory();
+            // Hold on to entries from the opened file, so the same objects are used before and after the write.
+            DirectoryEntryFile a = root.getEntry("a.txt").asFile();
+            DirectoryEntryFile unhashed = root.getEntry("unhashed.txt").asFile();
+            DirectoryEntryDirectory sub = root.getEntry("sub").asDirectory();
+            DirectoryEntryDirectory empty = root.getEntry("empty").asDirectory();
+            DirectoryEntryFile c = sub.getEntry("c.txt").asFile();
+            long aOffset = a.getFileContentOffset();
+            long aOffsetOffset = a.getFileContentOffsetOffset();
+            long unhashedOffsetOffset = unhashed.getFileContentOffsetOffset();
+            long cOffset = c.getFileContentOffset();
+            long cOffsetOffset = c.getFileContentOffsetOffset();
+            long rootOffsetOffset = root.getDirectoryOffsetOffset();
+            long subOffsetOffset = sub.getDirectoryOffsetOffset();
+            long emptyOffsetOffset = empty.getDirectoryOffsetOffset();
+
+            // Nest the tree one level down so that every entry lands at a different offset in the copy than in the
+            // original.
+            DirectoryEntryDirectoryMemory wrapper = new DirectoryEntryDirectoryMemory("WRAPPER");
+            try (ObjectWriter<DirectoryEntry> writer = wrapper.updateEntries()) {
+                writer.write(root);
+            }
+            BackupFile.writeToFile(copy, wrapper);
+
+            assertEquals(originalLength, file.length());
+            assertEquals(aOffset, a.getFileContentOffset());
+            assertEquals(aOffsetOffset, a.getFileContentOffsetOffset());
+            assertEquals(unhashedOffsetOffset, unhashed.getFileContentOffsetOffset());
+            assertEquals(cOffset, c.getFileContentOffset());
+            assertEquals(cOffsetOffset, c.getFileContentOffsetOffset());
+            assertEquals(rootOffsetOffset, root.getDirectoryOffsetOffset());
+            assertEquals(subOffsetOffset, sub.getDirectoryOffsetOffset());
+            assertEquals(emptyOffsetOffset, empty.getDirectoryOffsetOffset());
+
+            // The held entries still read from, and update, the original file.
+            assertEquals(List.of(content(3, 10L), content(4, 20L)), readContents(sub, "c.txt"));
+            try (ObjectWriter<FileContent> writer = a.updateFileContents()) {
+                writer.write(content(30, 10L));
+            }
+            try (ObjectWriter<FileContent> writer = unhashed.updateFileContents()) {
+                writer.write(content(31, 40L));
+            }
+            try (ObjectWriter<FileContent> writer = c.updateFileContents()) {
+                writer.write(content(32, 30L));
+            }
+            try (ObjectWriter<DirectoryEntry> writer = empty.updateEntries()) {
+                writer.write(memoryFile("new.txt", 5000L, 50L));
+            }
+            assertEquals(List.of(content(30, 10L)), readContents(root, "a.txt"));
+            assertEquals(List.of(content(32, 30L)), readContents(sub, "c.txt"));
+        }
+
+        // The copy is a faithful copy of the tree as it was when written.
+        try (BackupFile backupFile = BackupFile.open(copy)) {
+            DirectoryEntryDirectory wrapper = backupFile.getRootDirectory();
+            assertEquals(List.of("ROOT"), readEntryNames(wrapper));
+            assertSampleTree(wrapper.getEntry("ROOT").asDirectory());
+        }
+
+        // The original got the in-place updates, and nothing else changed.
+        try (BackupFile backupFile = BackupFile.open(file)) {
+            DirectoryEntryDirectory root = backupFile.getRootDirectory();
+            assertEquals(List.of(content(30, 10L)), readContents(root, "a.txt"));
+            assertEquals(List.of(content(31, 40L)), readContents(root, "unhashed.txt"));
+            DirectoryEntryDirectory sub = root.getEntry("sub").asDirectory();
+            assertEquals(List.of(content(32, 30L)), readContents(sub, "c.txt"));
+            assertEquals(List.of(content(2, 20L)), readContents(sub, "b.txt"));
+            assertEquals("../a.txt", sub.getEntry("link").asSymlink().getTarget());
+            DirectoryEntryDirectory empty = root.getEntry("empty").asDirectory();
+            assertEquals(List.of("new.txt"), readEntryNames(empty));
+            assertEquals(50L, empty.getEntry("new.txt").asFile().getSize());
+            assertEquals(BIG_COUNT, root.getEntry("zbig").asDirectory().getEntries().size());
+        }
+    }
+
+    @Test
+    void writingAMergeOfOpenedFilesLeavesThemUnchanged() throws IOException {
+        File diffFile = new File(tempDir, "diff");
+        DirectoryEntryDirectoryMemory diffRoot = new DirectoryEntryDirectoryMemory("ROOT");
+        DirectoryEntryDirectoryMemory diffSub = new DirectoryEntryDirectoryMemory("sub");
+        try (ObjectWriter<DirectoryEntry> writer = diffSub.updateEntries()) {
+            writer.write(memoryFile("b.txt", 2001L, 21L, content(40, 21L)));
+            writer.write(new DirectoryEntryNull("link"));
+        }
+        try (ObjectWriter<DirectoryEntry> writer = diffRoot.updateEntries()) {
+            writer.write(memoryFile("d.txt", 6000L, 60L, content(41, 60L)));
+            writer.write(diffSub);
+        }
+        BackupFile.writeToFile(diffFile, diffRoot);
+
+        File merged = new File(tempDir, "merged");
+        try (BackupFile base = BackupFile.open(file, true); BackupFile diff = BackupFile.open(diffFile, true)) {
+            DirectoryEntryDirectory baseRoot = base.getRootDirectory();
+            DirectoryEntryDirectory diffOpened = diff.getRootDirectory();
+            DirectoryEntryFile a = baseRoot.getEntry("a.txt").asFile();
+            DirectoryEntryFile d = diffOpened.getEntry("d.txt").asFile();
+            DirectoryEntryFile b = diffOpened.getEntry("sub").asDirectory().getEntry("b.txt").asFile();
+
+            BackupFile.writeToFile(merged, new DirectoryEntryDirectoryMerge(baseRoot, diffOpened));
+
+            try (ObjectWriter<FileContent> writer = a.updateFileContents()) {
+                writer.write(content(50, 10L));
+            }
+            try (ObjectWriter<FileContent> writer = d.updateFileContents()) {
+                writer.write(content(51, 60L));
+            }
+            try (ObjectWriter<FileContent> writer = b.updateFileContents()) {
+                writer.write(content(52, 21L));
+            }
+        }
+
+        try (BackupFile backupFile = BackupFile.open(merged)) {
+            DirectoryEntryDirectory root = backupFile.getRootDirectory();
+            assertEquals(List.of("a.txt", "d.txt", "empty", "sub", "unhashed.txt", "zbig"),
+                readEntryNames(root).stream().sorted().toList());
+            assertEquals(List.of(content(1, 10L)), readContents(root, "a.txt"));
+            assertEquals(List.of(content(41, 60L)), readContents(root, "d.txt"));
+            DirectoryEntryDirectory sub = root.getEntry("sub").asDirectory();
+            assertEquals(List.of("b.txt", "c.txt"), readEntryNames(sub).stream().sorted().toList());
+            assertEquals(List.of(content(40, 21L)), readContents(sub, "b.txt"));
+            assertEquals(List.of(content(3, 10L), content(4, 20L)), readContents(sub, "c.txt"));
+            assertEquals(BIG_COUNT, root.getEntry("zbig").asDirectory().getEntries().size());
+        }
+        try (BackupFile backupFile = BackupFile.open(file)) {
+            DirectoryEntryDirectory root = backupFile.getRootDirectory();
+            assertEquals(List.of(content(50, 10L)), readContents(root, "a.txt"));
+            DirectoryEntryDirectory sub = root.getEntry("sub").asDirectory();
+            assertEquals(List.of(content(2, 20L)), readContents(sub, "b.txt"));
+            assertEquals(List.of(content(3, 10L), content(4, 20L)), readContents(sub, "c.txt"));
+        }
+        try (BackupFile backupFile = BackupFile.open(diffFile)) {
+            DirectoryEntryDirectory root = backupFile.getRootDirectory();
+            assertEquals(List.of(content(51, 60L)), readContents(root, "d.txt"));
+            DirectoryEntryDirectory sub = root.getEntry("sub").asDirectory();
+            assertEquals(List.of(content(52, 21L)), readContents(sub, "b.txt"));
+            assertTrue(sub.getEntry("link").isNull());
+        }
+    }
+
     /**
      * Reads a file's contents through freshly opened streams, bypassing any cached entries.
      */

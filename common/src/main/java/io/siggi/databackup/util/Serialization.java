@@ -37,41 +37,50 @@ public final class Serialization {
     }
 
     private static void serializeDirectory(RandomAccessFile raf, RafOutputStream out, DirectoryEntryDirectory directory) throws IOException {
+        // The positions of each entry's offset placeholder are tracked here rather than stored on the entries, so
+        // that writing a tree never changes it. The entries may belong to an open BackupFile, and must keep pointing
+        // at their own file.
         Map<String, DirectoryEntry> entries = directory.getEntries();
         List<String> names = Util.sortedKeys(entries);
-        for (String name : names) {
-            DirectoryEntry entry = entries.get(name);
-            serializeDirectoryEntry(out, entry);
+        long[] placeholders = new long[names.size()];
+        for (int i = 0; i < names.size(); i++) {
+            placeholders[i] = serializeDirectoryEntry(out, entries.get(names.get(i)));
         }
         out.write(DIRECTORY_ENTRY_END);
-        for (String name : names) {
-            DirectoryEntry entry = entries.get(name);
-            if (!(entry instanceof DirectoryEntryFile file)) continue;
+        for (int i = 0; i < names.size(); i++) {
+            if (!(entries.get(names.get(i)) instanceof DirectoryEntryFile file)) continue;
             List<FileContent> fileContents = file.getFileContents();
-            if (fileContents.isEmpty()) {
-                file.setFileContentOffset(0L);
-                continue;
-            }
-            long filePointer = raf.getFilePointer();
-            file.setFileContentOffset(filePointer);
-            raf.seek(file.getFileContentOffsetOffset());
-            IO.writeLong(out, filePointer - file.getFileContentOffsetOffset());
-            raf.seek(filePointer);
+            if (fileContents.isEmpty()) continue; // the placeholder stays 0
+            writeOffset(raf, out, placeholders[i]);
             serializeFileContents(out, fileContents);
         }
-        for (String name : names) {
-            DirectoryEntry entry = entries.get(name);
-            if (!(entry instanceof DirectoryEntryDirectory dir)) continue;
-            long filePointer = raf.getFilePointer();
-            raf.seek(dir.getDirectoryOffsetOffset());
-            IO.writeLong(out, filePointer - dir.getDirectoryOffsetOffset());
-            raf.seek(filePointer);
+        for (int i = 0; i < names.size(); i++) {
+            if (!(entries.get(names.get(i)) instanceof DirectoryEntryDirectory dir)) continue;
+            writeOffset(raf, out, placeholders[i]);
             serializeDirectory(raf, out, dir);
         }
     }
 
-    public static void serializeDirectoryEntry(OutputStream out, DirectoryEntry entry) throws IOException {
+    /**
+     * Fills in the placeholder at {@code placeholder} with the current file pointer, relative to the placeholder, and
+     * returns to the current file pointer.
+     */
+    private static void writeOffset(RandomAccessFile raf, OutputStream out, long placeholder) throws IOException {
+        long filePointer = raf.getFilePointer();
+        raf.seek(placeholder);
+        IO.writeLong(out, filePointer - placeholder);
+        raf.seek(filePointer);
+    }
+
+    /**
+     * Writes a single directory entry, with a 0 placeholder for a file's content offset or a directory's offset. The
+     * entry itself is not changed.
+     *
+     * @return the position of the offset placeholder, or -1 if the entry has none
+     */
+    public static long serializeDirectoryEntry(OutputStream out, DirectoryEntry entry) throws IOException {
         FilePointer filePointer = (FilePointer) out;
+        long placeholder = -1L;
         boolean skipExtra = false;
         if (entry instanceof DirectoryEntryNull) {
             out.write(DIRECTORY_ENTRY_NULL);
@@ -80,14 +89,14 @@ public final class Serialization {
         } else if (entry instanceof DirectoryEntryFile file) {
             out.write(DIRECTORY_ENTRY_FILE);
             IO.writeString(out, file.getName());
-            file.setFileContentOffsetOffset(filePointer.getFilePointer());
+            placeholder = filePointer.getFilePointer();
             IO.writeLong(out, 0L); // placeholder
             IO.writeLong(out, file.getLastModified());
             IO.writeLong(out, file.getSize());
         } else if (entry instanceof DirectoryEntryDirectory dir) {
             out.write(DIRECTORY_ENTRY_DIRECTORY);
             IO.writeString(out, dir.getName());
-            dir.setDirectoryOffsetOffset(filePointer.getFilePointer());
+            placeholder = filePointer.getFilePointer();
             IO.writeLong(out, 0L); // placeholder
         } else if (entry instanceof DirectoryEntrySymlink symlink) {
             out.write(DIRECTORY_ENTRY_SYMLINK);
@@ -99,6 +108,7 @@ public final class Serialization {
         if (!skipExtra) {
             writeExtra(out, entry.getExtra());
         }
+        return placeholder;
     }
 
     public static DirectoryEntryFile deserializeFile(InputStream in, RandomAccessData data, String name) throws IOException {
