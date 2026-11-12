@@ -10,10 +10,10 @@ public abstract class ExtraData {
 
     public static ExtraData deserialize(int typeId, byte[] data) {
         try {
-            ExtraDataTypes.TypeRegistration typeRegistration = ExtraDataTypes.dataTypes.get(typeId - 1);
-            if (typeRegistration == null) {
+            if (typeId < 1 || typeId > ExtraDataTypes.dataTypes.size()) {
                 return new ExtraDataUnsupported(typeId, data);
             }
+            ExtraDataTypes.TypeRegistration typeRegistration = ExtraDataTypes.dataTypes.get(typeId - 1);
             return typeRegistration.deserializer().apply(data);
         } catch (Exception e) {
         }
