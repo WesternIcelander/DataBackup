@@ -593,7 +593,14 @@ These are settled; don't revisit them inside a step.
   - When the user reports back, or the log file exists: read the log, add fix steps right after this one for any
     `FAIL`, and mark this step `- [x]` only when everything passes.
 
-- [ ] **Run an end-to-end check on Linux with btrfs (test VM)**
+- [x] **Run an end-to-end check on Linux with btrfs (test VM)**
+  - Done: `e03e6e2` (2026-11-12). `docs/manual-checks/linux-btrfs-e2e.sh <client jar> <server URL> <token file>
+    <empty subvolume>` (run as root on the VM, server on the Mac with a fresh data folder) passed all 45 checks,
+    using the default `/etc/databackup/client.json` and `/var/lib/databackup-client`. Fixed: the scanner dropped
+    whole-second directory and symlink times (only sub-millisecond ones got `ExtraDataNanosecondModifiedDate`), so
+    restored directories got the restore time; connection errors now read "can't connect to the server"; both e2e
+    scripts now count the empty file's content, which the client uploads too. Symlink times restore only to the
+    microsecond on Linux (reported as INFO). The Windows step can reuse the script's flow.
   - Use `databackup-ubuntu` (see "Test VMs" in `CLAUDE.md`). Revert it first.
   - Run the server on this Mac and copy the client jar and a `client.json` to the VM, pointing at the Mac. The source
     is the test subvolume; put a few files in it first, including a symlink, an empty file, odd permissions and a
