@@ -28,6 +28,11 @@ public class SimpleAuthorization implements Authorization {
 
     @Override
     public boolean checkPermission(String permission) {
-        return permissions.contains(permission);
+        if (permission == null) return false;
+        if (permissions.contains(permission)) return true;
+        // "prefix:*" grants every permission of the form "prefix:<something>".
+        int colonPos = permission.indexOf(':');
+        if (colonPos == -1) return false;
+        return permissions.contains(permission.substring(0, colonPos + 1) + "*");
     }
 }
