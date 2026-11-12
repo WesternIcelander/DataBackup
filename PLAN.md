@@ -222,7 +222,14 @@ These are settled; don't revisit them inside a step.
     its hash, so it isn't tied to one machine.
   - Add tests: a multi-file upload, re-uploading existing content, and that the stored content's hash matches its ID.
 
-- [ ] **Fix backup listing, browsing and download**
+- [x] **Fix backup listing, browsing and download**
+  - Done: `70cd347` (2026-11-12). Listing and descent were already fixed earlier; this step added `?manifest`, JSON
+    (`?json` or `Accept: application/json`) for machine, backup (`name`, `time`, `snapshotId`) and directory listings
+    (`name`, `type`, `size`, `modified`, `modifiedNanos`, `target`, `permissions` {`mode`, `string`, `owner`, `group`}),
+    and downloads that assemble contents by offset with zero-filled gaps and a `Content-Length` (SiggiHTTP already
+    URL-decodes `request.url`). `returnStoredData` now uses common's `DataCompression`, whose gzip ID is `gzip`
+    (serverlib's `CompressionAlgorithms` uses `gz` and is now unused): the compression step must store with `gzip`.
+    It also blocks HTML/XML/SVG types and sends `nosniff`. Tests: `server` `BrowseAndDownloadTest`.
   - `GET /backups/:machine/` lists that machine's backups from `BackupRepository`; today it lists `backupsDir`.
     `GET /backups/` lists the machines the token can read.
   - Browsing: fix the loop in `RequestHandler` that drops the result of `getEntry(pathPieces[i])`, so paths really
