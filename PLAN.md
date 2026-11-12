@@ -677,7 +677,15 @@ These are settled; don't revisit them inside a step.
     collection.
   - Check that every command shown in the docs works as written.
 
-- [ ] **Do a final review and clean up**
+- [x] **Do a final review and clean up**
+  - Done: `c44dfc1` (2026-11-12). Reviewed the server (request handling, upload/commit, repositories, GC), the
+    content store and the client's backup, restore and snapshot paths. One bug fixed: `DataBackupServer` cleared
+    `tmp/` in its constructor, before taking the data-folder lock, so a second server on the same folder deleted
+    the running one's in-progress uploads; it now clears `tmp/` in `start()` (new test in `GarbageCollectionTest`).
+    Removed the unused `serverlib` compression package (`util/compression` is the one abstraction), the unused
+    `DataReader`, `ChainedInputStream` and `LimitedInputStream`, and unused imports; `DirectoryPrinter` is kept as a
+    debugging aid. `mvn -o -q verify` passes. The old branches (`main-old`, `main-old-old`, `wip-fsscanners`) are
+    untouched: the user still has to say whether to delete them.
   - Run a correctness review over the whole `main` branch: `/code-review` at `high`, or an equivalent careful
     review.
   - Fix confirmed bugs, or add them as new steps above this one.
