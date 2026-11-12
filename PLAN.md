@@ -75,11 +75,16 @@ These are settled; don't revisit them inside a step.
     `SimpleDateTime.parse` throws `DateTimeParseException` (or `NullPointerException` for null) instead.
   - Add tests: write a `BackupFile`, open it read-only and writable, update entries in place, reopen, and check the
     contents. Also test `TimeUtil` round trips and invalid input.
-  - Known SiggiTools bug, reported to the SiggiTools session on 2026-11-12: `RandomAccessDataFile` can return stale
-    bytes after `writeTo`, because closed, buffered streams are reused by later `getInputStream` calls. DataBackup's
-    in-place updates (`updateEntries` patching offsets) hit this. If the in-place update test fails because of it,
-    leave that test in place (mark it `@Disabled` with a note pointing at this bug), note it under this step, and
-    don't work around it in DataBackup. Re-enable it once a fixed SiggiTools `1.1-SNAPSHOT` is installed.
+  - Make in-place writes safe against SiggiTools' shared file pointer. `RandomAccessDataFile` reads and writes through
+    one `RandomAccessFile`, so any read made between `writeTo(offset)` and writing to the returned stream moves where
+    the write lands. The `ObjectWriter`s returned by `DirectoryEntryDirectoryDisk.updateEntries()` and
+    `DirectoryEntryFile.updateFileContents()` keep a single `writeTo()` stream open across many `write()` calls, and
+    callers such as `FileMetadataScanner.copyHashes` read in between. Make each `write()` (and `close()`) call
+    `data.writeTo(<tracked position>)` again instead of reusing the stream. Add a test that interleaves reads of the
+    same `BackupFile` with writer calls and checks the result.
+  - Note: a stream that is already open when a write happens can still return the old bytes (it buffers ahead).
+    Open new streams after writing rather than reusing ones from before. Reusing closed streams after a write was a
+    SiggiTools bug; it's fixed in `1.1-SNAPSHOT` `a0db869`, which the build uses.
 
 - [ ] **Fix `SimpleAuthorizer` token parsing and add auth tests**
   - In `serverlib/.../auth/simple/SimpleAuthorizer.java`, the `switch` in `readTokenFile` has no `break`s, so an
