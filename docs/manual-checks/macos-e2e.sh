@@ -340,9 +340,9 @@ uploaded_count() {
     printf '%s\n' "$BACKUP_OUTPUT" | sed -n 's/^Uploading \([0-9]*\) pieces of content .*$/\1/p' | head -n 1
 }
 
-# Number of distinct non-empty file contents in the test folder: what a first backup must upload.
+# Number of distinct file contents in the test folder, the empty one included: what a first backup must upload.
 distinct_contents() {
-    find "$SRC" -type f -size +0 -exec shasum -a 256 {} + | awk '{ print $1 }' | sort -u | wc -l | tr -d ' '
+    find "$SRC" -type f -exec shasum -a 256 {} + | awk '{ print $1 }' | sort -u | wc -l | tr -d ' '
 }
 
 stop_server() {
@@ -546,7 +546,7 @@ run_checks() {
     local first_backup="$BACKUP_NAME" expected_uploads uploads
     expected_uploads="$(distinct_contents)"
     uploads="$(uploaded_count)"
-    check "first backup: uploaded every distinct non-empty content once ($expected_uploads expected, ${uploads:-none} uploaded)" \
+    check "first backup: uploaded every distinct content (the empty one too) once ($expected_uploads expected, ${uploads:-none} uploaded)" \
         equals "$uploads" "$expected_uploads"
     check "first backup: the manifest excluded the rest of the Data volume (an \"Ignored\" summary was printed)" \
         contains_text "$BACKUP_OUTPUT" "Ignored (excluded or .nobackup)"

@@ -220,9 +220,10 @@ public class FileMetadataScanner {
         Stat stat = Stat.lstat(file);
         if (stat == null) return;
         entry.getExtra().add(new ExtraDataPosixPermissions(stat.mode & 07777, stat.uid, stat.gid));
-        if (stat.mtimensec % 1000000L != 0L) {
-            // only add nanoseconds if the file timestamp has an apparent level of precision higher than milliseconds
-            // 1 million nanoseconds in 1 millisecond
+        if (!entry.isFile() || stat.mtimensec % 1000000L != 0L) {
+            // A file has a millisecond time of its own, so only add nanoseconds if its timestamp has an apparent level
+            // of precision higher than milliseconds (1 million nanoseconds in 1 millisecond). Directories and
+            // symlinks have no other modified time, so they always get it.
             entry.getExtra().add(new ExtraDataNanosecondModifiedDate(stat.mtime, (int) stat.mtimensec));
         }
     }

@@ -1,6 +1,7 @@
 package io.siggi.databackup.client.snapshot;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
@@ -24,6 +25,12 @@ public final class IoMessages {
             return e.getClass().getSimpleName() + ": " + f.getFile();
         }
         String message = e.getMessage();
+        if (e instanceof ConnectException) {
+            // HttpClient's ConnectException often has no message of its own; its cause says why.
+            String why = message;
+            if ((why == null || why.isBlank()) && e.getCause() != null) why = e.getCause().getMessage();
+            return "can't connect to the server" + (why == null || why.isBlank() ? "" : ": " + why);
+        }
         return message == null || message.isBlank() ? e.toString() : message;
     }
 }

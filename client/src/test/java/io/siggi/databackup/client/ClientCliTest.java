@@ -338,7 +338,7 @@ class ClientCliTest {
         platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
         Result r = run(platform, "--config", file.toString(), "backup");
         assertEquals(ClientCli.FAILED, r.exitCode());
-        assertTrue(r.err().startsWith("Backup failed: "), r.err());
+        assertTrue(r.err().startsWith("Backup failed: can't connect to the server"), r.err());
         assertTrue(Files.isRegularFile(dir.resolve("state").resolve("pending-manifest")));
         assertFalse(Files.exists(dir.resolve("state").resolve("last-manifest")));
         assertTrue(platform.existing.isEmpty());

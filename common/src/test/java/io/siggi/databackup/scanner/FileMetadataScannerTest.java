@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.siggi.databackup.data.BackupFile;
@@ -14,6 +15,7 @@ import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.content.ContentIDFileContent;
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataFilePath;
+import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
 import io.siggi.databackup.util.Util;
 import java.io.File;
@@ -23,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -293,5 +296,25 @@ class FileMetadataScannerTest {
         } finally {
             Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
         }
+    }
+
+    @Test
+    void wholeSecondTimesAreRecordedForDirectoriesAndSymlinks() throws Exception {
+        FileTime wholeSecond = FileTime.from(Instant.parse("2020-01-02T03:04:05Z"));
+        Files.setLastModifiedTime(source.resolve("a.txt"), wholeSecond);
+        Files.setLastModifiedTime(source.resolve("empty"), wholeSecond);
+        DirectoryEntryDirectory root = scan().rootDirectory;
+
+        // A file's own millisecond time already holds a whole-second time exactly.
+        DirectoryEntryFile a = root.getEntry("a.txt").asFile();
+        assertEquals(wholeSecond.toMillis(), a.getLastModified());
+        assertNull(a.getExtra(ExtraDataNanosecondModifiedDate.class));
+        // Directories and symlinks have no other time, so they always get the nanosecond one. (Java can't set a
+        // symlink's own time on every system, so the symlink's is whatever it was created with.)
+        ExtraDataNanosecondModifiedDate time = root.getEntry("empty").getExtra(ExtraDataNanosecondModifiedDate.class);
+        assertNotNull(time);
+        assertEquals(wholeSecond.toInstant().getEpochSecond(), time.seconds);
+        assertEquals(0, time.nanos);
+        assertNotNull(root.getEntry("link").getExtra(ExtraDataNanosecondModifiedDate.class));
     }
 }
