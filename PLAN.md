@@ -632,7 +632,13 @@ These are settled; don't revisit them inside a step.
     - Restore works without POSIX metadata.
   - Fix whatever fails, in this step if small, otherwise as new steps right after this one. Stop the VM when done.
 
-- [ ] **Stop the client's slow `SecureRandom` seeding on Windows**
+- [x] **Stop the client's slow `SecureRandom` seeding on Windows**
+  - Done: `84902a8` (2026-11-12). The cause was wider than `HttpClient`'s `SSLContext`: the JDK's Windows seed
+    generator fails over SSH ("Required native CryptoAPI features not available") and falls back to
+    `ThreadedSeedGenerator`, and `UUID.randomUUID()` and the `HttpClient` selector's pipe also use `new SecureRandom()`.
+    `DataBackupClient.main` now calls `WindowsSecureRandom.install()` first, which on Windows adds a top-priority
+    provider offering only a `SecureRandom` that delegates to SunMSCAPI's `Windows-PRNG`. `databackup list` on
+    `databackup-win10`: about 9.3s before, 1.1s after; HTTPS (TLS 1.3) and a backup still work.
   - On `databackup-win10` every client command that talks to the server takes about 8s longer than it should:
     `ServerApi`'s `HttpClient.newBuilder().build()` calls `SSLContext.getDefault()`, whose DRBG seeds itself with
     `SeedGenerator$ThreadedSeedGenerator` (seen with `jstack`), even for `http://` URLs. The server itself answers in
