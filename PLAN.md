@@ -545,7 +545,14 @@ These are settled; don't revisit them inside a step.
     `BackupRepository`. Never delete the newest backup.
   - Add `server prune [--dry-run]` to the server CLI.
 
-- [ ] **Add garbage collection for content and temp files**
+- [x] **Add garbage collection for content and temp files**
+  - Done: `2c2b1f9` (2026-11-12). New `server/.../gc/GarbageCollector` (mark committed manifests, i.e. timestamp-named
+    files, plus pending ones younger than the grace period; an unreadable committed manifest aborts content deletion);
+    `DataBackupServer.gc(dryRun)` runs after pruning in `cleanup()` and `server gc [--dry-run]` works offline.
+    A `ReentrantReadWriteLock` (read: manifest upload's pending-to-missing-list part and commit; write: gc) plus
+    `ContentReceiver.lockFor` per deletion keep it safe. Beyond the plan: a started server holds a file lock on
+    `server.lock` in the data folder, so the CLI `gc` and a second server refuse to run alongside it (`prune` from
+    the CLI still doesn't check it). Documented in `docs/server-api.md`. Tests: `server` `GarbageCollectionTest`.
   - Mark and sweep:
     - Mark every content ID referenced by any committed or pending manifest of any machine.
     - Then go through `DataRepository.openStream()` and delete unreferenced content whose `getLastTouch()` is older
