@@ -647,7 +647,13 @@ These are settled; don't revisit them inside a step.
     initialized from a fast source (such as `Windows-PRNG` on Windows) only when the URL is `https://`, or another
     way that avoids the slow seeding. Measure `databackup list` on the VM before and after.
 
-- [ ] **Replace `wmic` for creating shadow copies**
+- [x] **Replace `wmic` for creating shadow copies**
+  - Done: `0d0a792` (2026-11-12). New `VssCim` runs Windows PowerShell (`-EncodedCommand`) against
+    `Win32_ShadowCopy` for create (`Invoke-CimMethod`), list (`Get-CimInstance`: ID, VolumeName, DeviceObject) and
+    delete (`Remove-CimInstance`), so neither `wmic` nor `vssadmin`'s English output is used; a failed listing now
+    throws instead of looking empty. On `databackup-win10`: create about 5s, delete about 2s; mount path, deleting a
+    missing copy and the pre-existing copy all behave, and the Windows end-to-end script passed all 49 checks (it
+    still reads `vssadmin list shadows` itself, which is fine on the en-US VM).
   - `NtfsDiskUtil` creates shadow copies with `wmic shadowcopy call create`. `wmic` is deprecated and removed from
     newer Windows 11 builds. Switch to PowerShell's CIM (`Invoke-CimMethod -ClassName Win32_ShadowCopy -MethodName
     Create`) or another supported way, keeping `vssadmin` (or CIM) for listing and deleting.
