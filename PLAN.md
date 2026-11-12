@@ -208,7 +208,12 @@ These are settled; don't revisit them inside a step.
   - Add tests: upload with content missing, then upload the content, then commit, then the backup is listed; commit
     with content still missing gives `409`; a duplicate UUID gives `409`; gzipped and plain uploads both work.
 
-- [ ] **Fix content upload**
+- [x] **Fix content upload**
+  - Done: `8be4b7d` (2026-11-12). `POST /upload` answers `{"stored", "alreadyPresent"}` (a part repeated in one
+    upload is `alreadyPresent` the second time); existing content is touched, new content is touched too, and the
+    part's filename (last path component, if non-empty) is recorded. Malformed multipart gives `400`. Tests:
+    `server` `ContentUploadTest`; `ServerTestHarness.uploadContent(token, FilePart...)` builds multipart bodies, and
+    `ManifestUploadTest` now stores content through it.
   - In `ContentReceiver.handle`, respond with JSON `{"stored": [...], "alreadyPresent": [...]}`. Today it builds
     `allItems` and never sends it.
   - When the content already exists, `touch()` it instead of reporting failure.
