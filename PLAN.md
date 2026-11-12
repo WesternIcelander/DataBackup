@@ -180,7 +180,16 @@ These are settled; don't revisit them inside a step.
     can escape `backupsDir` (`..`, absolute paths, separators).
   - Add tests for each error case.
 
-- [ ] **Rework manifest upload into upload, then commit**
+- [x] **Rework manifest upload into upload, then commit**
+  - Done: `ea88b8f` (2026-11-12). `pendingId` is a fresh random UUID (not the snapshot UUID), so a client can retry
+    an upload; duplicate snapshot IDs are rejected at upload and again at commit (`409`, `text/plain`). Commit's
+    `409` for missing content is JSON `{"error", "missing"}`; success is `{"backup": "<name>"}`, using the commit
+    time and bumping to the next free second on a name clash. `BackupRepositories` (new `exists`/`listNames`) now
+    backs machine listing, backup listing and browsing, so only files `BackupRepository` accepts (timestamp name and
+    snapshot ID) are listed, and repositories are cached: files dropped into `backups/` by hand aren't seen until
+    the repository is reloaded. Tests: `server` `ManifestUploadTest`; content is stored through `DataRepository`
+    directly (switch to `POST /upload` in the content-upload step) and committed files are checked by browsing,
+    since downloading stored content still crashes in `returnStoredData` (download step).
   - `PUT /backups/:machine` receives a manifest, optionally gzipped. Fix the `NullPointerException` when there's no
     `Content-Encoding` header.
   - Re-serialize the manifest into canonical form (as today) and store it as pending under
