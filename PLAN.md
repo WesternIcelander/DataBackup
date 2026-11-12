@@ -452,7 +452,13 @@ These are settled; don't revisit them inside a step.
     `backup`, then the backup is listed and its files download with the right bytes. Run a second backup after
     changing one file and check that only that file's content is uploaded.
 
-- [ ] **Add packaging and scheduling examples**
+- [x] **Add packaging and scheduling examples**
+  - Done: `16d5446` (2026-11-12). Shade builds `server/target/databackup-server.jar` and
+    `client/target/databackup-client.jar` via `outputFile`, so the normal module jars (used by tests) are untouched.
+    `docs/scheduling/` has the examples plus a README (install paths, commands). Verified on the VMs: the systemd units
+    pass `systemd-analyze verify` and ran a real server and backup (units use bare `java`, since the VM's Java is in
+    `/usr/local/bin`); the Task Scheduler XML (no `encoding` in its XML declaration, or `schtasks` rejects it) and the
+    `schtasks` one-liner both ran a real VSS backup as SYSTEM. The plists only pass `plutil -lint`.
   - Use `maven-shade-plugin` to build runnable jars for `server` and `client`, with `Main-Class` set
     (`dependency-reduced-pom.xml` is already gitignored).
   - Add `docs/scheduling/` with:
