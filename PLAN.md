@@ -663,7 +663,14 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 7: Finishing
 
-- [ ] **Write the README and user docs**
+- [x] **Write the README and user docs**
+  - Done: `806fdf7` (2026-11-12). New `README.md`; it links to `docs/scheduling/README.md` and `docs/server-api.md`
+    instead of repeating them. Checked as written: the server's `help`, `token create/list/revoke`, `serve`,
+    `prune`/`gc` (with and without `--dry-run`; `gc` refuses while the server runs), the example `server.json`, web
+    UI login (also `Secure` with `X-Forwarded-Proto`), and on `databackup-ubuntu` a `sudo databackup backup` with the
+    default config plus every `list`/`restore` form and `snapshots cleanup`. The default config is root-only, so the
+    README says to run `list`/`restore` with `sudo` or with an own `--config` (which still needs a `sources` entry).
+    The Caddy and nginx snippets are untested (neither is installed) and are marked as starting points.
   - `README.md`: what DataBackup is, the architecture (client, server, content store, manifests), building, server
     setup (data folder, `server.json`, tokens, HTTPS through a reverse proxy), client setup per OS (`client.json`,
     privileges, scheduling from `docs/scheduling/`), backup, list, restore, the web UI, retention and garbage
