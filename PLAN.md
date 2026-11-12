@@ -107,7 +107,12 @@ These are settled; don't revisit them inside a step.
   - Add tests covering token lookup (the file is named after the SHA-256 of the token), parsing, and wildcard and
     exact permission checks.
 
-- [ ] **Add round-trip tests for the backup format**
+- [x] **Add round-trip tests for the backup format**
+  - Done: `13a1ae6` (2026-11-12). Added `BackupFormatRoundTripTest`, `util/DiffMakerTest` and
+    `scanner/FileMetadataScannerTest`, with shared `testutil/TreeBuilder` and `testutil/TreeAssert` (deep tree
+    comparison for any `DirectoryEntryDirectory`). Fixed `ExtraData.deserialize` silently dropping unknown extra data
+    types (it now returns `ExtraDataUnsupported`, which gained `equals`/`hashCode`). No other bugs showed up; one
+    hazard is added as the next step.
   - Tests in `common` for:
     - `BackupFile.writeToFile` then `BackupFile.open`, covering a tree with nested directories, files with
       `ContentIDFileContent`, `InlinedFileContent` and `ZeroFilledFileContent`, symlinks, an empty directory, and
@@ -117,6 +122,15 @@ These are settled; don't revisit them inside a step.
     - `FileMetadataScanner` on a temp folder: correct counts and hashes, `.nobackup` excludes a directory, the path
       predicate excludes paths, and `copyHashes` skips re-hashing unchanged files.
   - Fix any bugs the tests uncover, in this step if they're small; otherwise add them as new plan steps.
+
+- [ ] **Stop `BackupFile.writeToFile` from changing the tree it writes**
+  - `Serialization.serializeDirectory`/`serializeDirectoryEntry` call `setFileContentOffsetOffset`,
+    `setFileContentOffset` and `setDirectoryOffsetOffset` on the entries being written. When the tree comes from an
+    open `BackupFile` (for example writing a `DirectoryEntryDirectoryMerge` of two opened manifests, which the server
+    will do), those entries then point at offsets in the *new* file: their contents read wrong once the cached
+    lists are dropped, and a later in-place `updateEntries`/`updateFileContents` on a writable source patches the wrong
+    place. Track the offsets locally during serialization instead, and add a test that writes an opened
+    `BackupFile`'s tree to a new file and then reads and updates the original.
 
 ## Phase 1: Server
 
