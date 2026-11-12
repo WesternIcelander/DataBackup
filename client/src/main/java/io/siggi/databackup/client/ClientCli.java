@@ -143,6 +143,8 @@ final class ClientCli {
         switch (command) {
             case "backup":
                 return BackupCommand.run(clientConfig, platform, apiFactory, out, err);
+            case "list":
+                return ListCommand.run(clientConfig, positionals, apiFactory, out, err);
             case "snapshots":
                 return SnapshotCommands.cleanup(clientConfig, platform, out, err);
             default:

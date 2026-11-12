@@ -134,7 +134,7 @@ class ClientCliTest {
                 {"restore", "m", "latest", "/a", dir.resolve("out").toString(), "--overwrite", "--config=" + file},
                 {"snapshots", "cleanup", "--config", file.toString()}}) {
             Result r = run(args);
-            // The config must have been read and accepted. Scanning, list and restore come in later steps.
+            // The config must have been read and accepted. Restore comes in a later step.
             if (args[0].equals("snapshots")) {
                 assertEquals(ClientCli.OK, r.exitCode(), r.err());
                 assertTrue(r.out().contains("No leftover snapshots."), r.out());
@@ -144,6 +144,11 @@ class ClientCliTest {
             if (List.of(args).contains("backup")) {
                 // The fake platform says the source doesn't exist.
                 assertTrue(r.err().contains("These sources can't be snapshotted"), r.err());
+                continue;
+            }
+            if (List.of(args).contains("list")) {
+                // Nothing listens on the configured server.
+                assertTrue(r.err().startsWith("List failed: "), r.err());
                 continue;
             }
             assertTrue(r.err().contains("not implemented yet"), r.err());
@@ -395,7 +400,7 @@ class ClientCliTest {
     @Test
     void doubleDashEndsOptions() throws Exception {
         Path file = writeConfig("custom.json");
-        Result r = run("--config", file.toString(), "list", "m", "b", "--", "--weird-path");
+        Result r = run("--config", file.toString(), "restore", "m", "b", "--", "--weird-path", "dest");
         assertEquals(ClientCli.FAILED, r.exitCode(), r.err());
         assertTrue(r.err().contains("not implemented yet"), r.err());
     }
