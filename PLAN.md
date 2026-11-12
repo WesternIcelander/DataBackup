@@ -395,7 +395,14 @@ These are settled; don't revisit them inside a step.
   - Add a test-only entry point that builds a manifest from plain temp folders without snapshots. It must not be
     reachable from the CLI. Use it to test the layout and hash reuse.
 
-- [ ] **(manual) Prepare an APFS snapshot smoke test for the user**
+- [~] **(manual) Prepare an APFS snapshot smoke test for the user**
+  - Awaiting verification: `2d851fd` (2026-11-12). User must follow docs/manual-checks/macos.md and report results.
+    The one command (after the two `mvn` build commands in that doc): `sudo docs/manual-checks/macos-apfs-smoke.sh`;
+    results go to `target/manual-checks/macos-apfs-smoke.log`. The script drives the test-only helper
+    `client/src/test/.../ApfsSmokeCheck` (real `SnapshotCommands.backup` orchestration with source `/`, scanning only
+    a test folder inside the snapshot via `ManifestBuilder.build`) and the real CLI for `snapshots cleanup`. Checked
+    so far: `bash -n`, the non-root refusal and missing-build messages, the dump format (`ApfsSmokeCheckTest`), and
+    the CLI cleanup output with nothing recorded. Nothing later depends on this step.
   - Agents can't run this: APFS snapshots need root, and `sudo` asks for a password. **Don't wait for the user and
     don't block the run.** Prepare everything, mark the step `- [~]`, and return ok so the workflow continues. No
     later step may depend on this one's result.
