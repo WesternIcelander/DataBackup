@@ -335,7 +335,15 @@ These are settled; don't revisit them inside a step.
   - Tests against the server test harness. Add the `server` module as a test-scoped dependency of `client`, or move
     the harness into a shared test-jar.
 
-- [ ] **Orchestrate snapshots in the client**
+- [x] **Orchestrate snapshots in the client**
+  - Done: `c545713` (2026-11-12). New `client/.../snapshot/` package: `VolumeResolver` (via `SnapshotPlatform`, faked in
+    tests) maps sources to `SnapshotVolume`s, `SnapshotManager.takeSnapshots` returns a `SnapshotSession` whose
+    `snapshots()` give each source's `scanPath` (a string; on Windows the `\\?\GLOBALROOT\...` device path) and whose
+    `close()` deletes them; `SnapshotCommands.backup` takes a `SnapshotWork` callback where the next step plugs in
+    scanning (it prints "not implemented yet" for now). Leftovers are cleaned at the start of `backup` and by
+    `snapshots cleanup` (not by `list`/`restore`, which needn't run as root); a `stateDir/lock` file lock keeps runs
+    apart. Fixed `NtfsSnapshotSerializer` (couldn't read its own UUIDs). Verified on both VMs (snapshot, crash,
+    cleanup, nothing left behind, pre-existing shadow copy kept); APFS is covered only by the later manual steps.
   - For each source, work out its filesystem and pick the matching `DiskUtil`:
     - macOS: `MountedDisk.getAll()`, `apfs`. The root `/` maps to `/System/Volumes/Data`, as `ApfsScanner` on
       `wip-fsscanners` does.
