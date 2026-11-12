@@ -261,7 +261,14 @@ These are settled; don't revisit them inside a step.
   - Downloads must still work for clients that don't accept gzip (`returnStoredData` already handles both cases).
     Test both.
 
-- [ ] **Add server configuration and token management**
+- [x] **Add server configuration and token management**
+  - Done: `57a6732` (2026-11-12). `ServerConfig` reads `server.json` (`bindAddress`, `port`, `retention`
+    {`keepLast` 10, `keepDaily` 14, `keepWeekly` 8, `keepMonthly` 24 by default}, `machineRetention` overrides that
+    fall back per key via `getRetention(machine)`, `gcGracePeriodHours` 48, `minCompressionSavings` 0.05); invalid
+    values fail startup. `DataBackupServer` loads it in every constructor (new 4-arg one takes a config); a `null`
+    address uses the config's. `main` delegates to `ServerCli` (add `prune`/`gc` there); tokens go through serverlib's
+    new `SimpleTokenStore` (files gain `created=`; revoke by `id` or file hash). `token create` prints only the token
+    on stdout. Tests: `serverlib` `SimpleTokenStoreTest`, `server` `ServerCliTest`, `ServerConfigTest`.
   - Server config file `server.json` in the data folder, read with Gson: bind address, port, retention defaults
     (used in Phase 5), garbage-collection grace period, and the minimum compression saving (default `0.05`, applied
     through `DataRepository.setCompressionPolicy`). Missing file means today's defaults. The
