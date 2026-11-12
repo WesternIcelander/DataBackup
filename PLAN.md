@@ -613,7 +613,16 @@ These are settled; don't revisit them inside a step.
     removes what it left behind.
   - Fix whatever fails, in this step if small, otherwise as new steps right after this one. Stop the VM when done.
 
-- [ ] **Run an end-to-end check on Windows with NTFS VSS (test VM)**
+- [x] **Run an end-to-end check on Windows with NTFS VSS (test VM)**
+  - Done: `d350a75` (2026-11-12). `docs/manual-checks/windows-vss-e2e.ps1 <client jar> <server URL> <token file>`
+    (elevated PowerShell on the VM, server on the Mac with a fresh data folder) passed all 49 checks: source `C:\`
+    with every top-level entry but `C:\databackup-e2e` and `C:\databackup-e2e-root.txt` excluded, a file held open
+    with no sharing is backed up, the root listing works, the pre-existing shadow copy is kept, and `snapshots
+    cleanup` removes a killed run's shadow copy. Fixed: the scanner recorded no nanosecond time on Windows (so
+    directories and symlinks got no time and files only milliseconds; it now reads NTFS times through NIO), and
+    restore now creates symlinks last so Windows makes directory symlinks. File attributes (read-only, hidden)
+    aren't backed up (INFO only), and the client's output can't show characters outside the system code page.
+    Every client run on the VM spends about 8s seeding `SecureRandom` (new step below).
   - Use `databackup-win10` (see "Test VMs" in `CLAUDE.md`). Revert it first. The SSH session is elevated.
   - The same flow as the Linux step: the server on this Mac, the client on the VM, backing up a test folder on `C:`.
     Also check:
@@ -622,6 +631,15 @@ These are settled; don't revisit them inside a step.
       be left alone.
     - Restore works without POSIX metadata.
   - Fix whatever fails, in this step if small, otherwise as new steps right after this one. Stop the VM when done.
+
+- [ ] **Stop the client's slow `SecureRandom` seeding on Windows**
+  - On `databackup-win10` every client command that talks to the server takes about 8s longer than it should:
+    `ServerApi`'s `HttpClient.newBuilder().build()` calls `SSLContext.getDefault()`, whose DRBG seeds itself with
+    `SeedGenerator$ThreadedSeedGenerator` (seen with `jstack`), even for `http://` URLs. The server itself answers in
+    milliseconds.
+  - Find a fix that keeps HTTPS working, for example creating the `HttpClient` lazily with an `SSLContext`
+    initialized from a fast source (such as `Windows-PRNG` on Windows) only when the URL is `https://`, or another
+    way that avoids the slow seeding. Measure `databackup list` on the VM before and after.
 
 - [ ] **Replace `wmic` for creating shadow copies**
   - `NtfsDiskUtil` creates shadow copies with `wmic shadowcopy call create`. `wmic` is deprecated and removed from
