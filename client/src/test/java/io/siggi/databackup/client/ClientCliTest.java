@@ -134,7 +134,7 @@ class ClientCliTest {
                 {"restore", "m", "latest", "/a", dir.resolve("out").toString(), "--overwrite", "--config=" + file},
                 {"snapshots", "cleanup", "--config", file.toString()}}) {
             Result r = run(args);
-            // The config must have been read and accepted. Restore comes in a later step.
+            // The config must have been read and accepted.
             if (args[0].equals("snapshots")) {
                 assertEquals(ClientCli.OK, r.exitCode(), r.err());
                 assertTrue(r.out().contains("No leftover snapshots."), r.out());
@@ -151,8 +151,8 @@ class ClientCliTest {
                 assertTrue(r.err().startsWith("List failed: "), r.err());
                 continue;
             }
-            assertTrue(r.err().contains("not implemented yet"), r.err());
-            assertTrue(r.err().contains(file.toString()), r.err());
+            // Restore: nothing listens on the configured server.
+            assertTrue(r.err().startsWith("Restore failed: "), r.err());
         }
     }
 
@@ -402,6 +402,7 @@ class ClientCliTest {
         Path file = writeConfig("custom.json");
         Result r = run("--config", file.toString(), "restore", "m", "b", "--", "--weird-path", "dest");
         assertEquals(ClientCli.FAILED, r.exitCode(), r.err());
-        assertTrue(r.err().contains("not implemented yet"), r.err());
+        // Got past argument parsing: nothing listens on the configured server.
+        assertTrue(r.err().startsWith("Restore failed: "), r.err());
     }
 }

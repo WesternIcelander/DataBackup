@@ -37,7 +37,11 @@ final class ClientCli {
               list <machine> <backup> [path]          List a directory inside a backup ("latest" works as a
                                                       backup name).
               restore <machine> <backup> <path-in-backup> <destination> [--overwrite]
-                                                      Restore a file or directory from a backup.
+                                                      Restore a file or directory from a backup. A
+                                                      directory's contents go into <destination>; a file
+                                                      goes to <destination>, or into it if it is a
+                                                      directory. Use "/" as the path for the whole backup.
+                                                      Existing files are replaced only with --overwrite.
               snapshots cleanup                       Delete snapshots left behind by an interrupted backup.
               help                                    Show this help.
 
@@ -145,10 +149,12 @@ final class ClientCli {
                 return BackupCommand.run(clientConfig, platform, apiFactory, out, err);
             case "list":
                 return ListCommand.run(clientConfig, positionals, apiFactory, out, err);
+            case "restore":
+                return RestoreCommand.run(clientConfig, positionals, parsed.flag("overwrite"), apiFactory, out, err);
             case "snapshots":
                 return SnapshotCommands.cleanup(clientConfig, platform, out, err);
             default:
-                return notImplemented(command, clientConfig, err);
+                throw new IllegalStateException("Unhandled command: " + command);
         }
     }
 
@@ -165,12 +171,6 @@ final class ClientCli {
             }
         }
         return ClientConfig.load(configFile, defaults.stateDir());
-    }
-
-    private static int notImplemented(String command, ClientConfig config, PrintStream err) {
-        err.println("The " + command + " command is not implemented yet (config " + config.getConfigFile()
-                + " is valid).");
-        return FAILED;
     }
 
     private static String usageText(ClientPaths defaults) {
