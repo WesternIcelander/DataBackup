@@ -3,8 +3,10 @@ package io.siggi.databackup.server.repository;
 import java.io.File;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -17,6 +19,26 @@ public class BackupRepositories {
 
     public BackupRepositories(File directory) {
         this.directory = directory;
+    }
+
+    /**
+     * Returns whether a folder for the named machine exists.
+     */
+    public boolean exists(String name) {
+        return new File(directory, name).isDirectory();
+    }
+
+    /**
+     * Returns the names of all machine folders, unsorted and unfiltered.
+     */
+    public List<String> listNames() {
+        List<String> names = new ArrayList<>();
+        File[] files = directory.listFiles();
+        if (files == null) return names;
+        for (File file : files) {
+            if (file.isDirectory()) names.add(file.getName());
+        }
+        return names;
     }
 
     public BackupRepository get(String name) {

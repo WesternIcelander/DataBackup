@@ -30,6 +30,25 @@ public class BackupRepository {
         reload();
     }
 
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Returns the folder this machine's backups are stored in. It may not exist yet.
+     */
+    public File getDirectory() {
+        return directory;
+    }
+
+    /**
+     * Returns the folder uploaded manifests wait in until they are committed. {@link #reload()} skips it, so pending
+     * manifests are never listed as backups.
+     */
+    public File getPendingDirectory() {
+        return new File(directory, ".pending");
+    }
+
     public BackupItem get(String name) {
         readLock.lock();
         try {
@@ -67,6 +86,12 @@ public class BackupRepository {
         }
     }
 
+    /**
+     * Moves {@code file} into this repository as a backup named after {@code time}.
+     *
+     * @return the new item, or {@code null} if the name or the manifest's snapshot UUID is already taken, the
+     * manifest has no snapshot UUID, or the file could not be moved
+     */
     public BackupItem add(File file, long time) {
         String name = TimeUtil.toString(time);
         File target = new File(directory, name);

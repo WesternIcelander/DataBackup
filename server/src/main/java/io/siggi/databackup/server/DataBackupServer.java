@@ -4,6 +4,7 @@ import io.siggi.databackup.auth.Authorizer;
 import io.siggi.databackup.auth.simple.SimpleAuthorizer;
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.osutils.OS;
+import io.siggi.databackup.server.repository.BackupRepositories;
 import io.siggi.http.HTTPServer;
 import io.siggi.http.HTTPServerBuilder;
 
@@ -15,7 +16,7 @@ import java.net.Socket;
 
 public class DataBackupServer implements AutoCloseable {
     final File root;
-    final File backupsDir;
+    private final BackupRepositories backupRepositories;
     final File tmpDir;
     private final DataRepository dataRepository;
     final ContentReceiver contentReceiver;
@@ -50,7 +51,7 @@ public class DataBackupServer implements AutoCloseable {
      */
     public DataBackupServer(File root, InetSocketAddress listenerAddress, Authorizer authorizer) throws IOException {
         this.root = root;
-        this.backupsDir = new File(root, "backups");
+        this.backupRepositories = new BackupRepositories(new File(root, "backups"));
         this.tmpDir = new File(root, "tmp");
         if (!tmpDir.exists()) tmpDir.mkdirs();
         for (File file : tmpDir.listFiles()) {
@@ -180,5 +181,9 @@ public class DataBackupServer implements AutoCloseable {
 
     public DataRepository getDataRepository() {
         return dataRepository;
+    }
+
+    public BackupRepositories getBackupRepositories() {
+        return backupRepositories;
     }
 }

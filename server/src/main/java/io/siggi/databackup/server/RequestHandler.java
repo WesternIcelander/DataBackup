@@ -10,18 +10,26 @@ import io.siggi.databackup.data.DirectoryEntry;
 import io.siggi.databackup.data.DirectoryEntryDirectory;
 import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.content.FileContent;
+import io.siggi.databackup.data.extra.ExtraDataSnapshotId;
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.datarepository.StoredData;
+import io.siggi.databackup.server.repository.BackupItem;
+import io.siggi.databackup.server.repository.BackupRepositories;
+import io.siggi.databackup.server.repository.BackupRepository;
 import io.siggi.databackup.util.TimeUtil;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.http.HTTPRequest;
 import io.siggi.http.HTTPResponder;
 import io.siggi.http.exception.EndResponse;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipException;
@@ -43,9 +51,10 @@ public class RequestHandler implements HTTPResponder {
 
     /**
      * Names allowed for machines and backups: letters, digits, {@code .}, {@code _} and {@code -}, not starting with
-     * {@code .}. This keeps every name a single, non-hidden path component inside {@code backupsDir}.
+     * {@code .}. This keeps every name a single, non-hidden path component inside the backups folder.
      */
     private static final Pattern NAME_PATTERN = Pattern.compile("[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}");
+    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final Pattern CONTENT_ID_PATTERN = Pattern.compile("[0-9a-f]{64}");
 
     static boolean isValidName(String name) {
@@ -123,54 +132,72 @@ public class RequestHandler implements HTTPResponder {
             backupPath = null;
         }
         if (!isValidName(machine)) throw new HttpError(400, "Invalid machine name");
-        File machineDirectory = new File(server.backupsDir, machine);
         if (backupPath == null) {
             if (request.method.equals("PUT")) {
                 if (!auth.checkPermission("upload:" + machine)) throw forbidden("upload:" + machine);
-                uploadManifest(request, machineDirectory);
+                uploadManifest(request, server.getBackupRepositories().get(machine));
             } else if (request.method.equals("GET")) {
                 if (!auth.checkPermission("read:" + machine)) throw forbidden("read:" + machine);
-                listBackups(request, machineDirectory);
+                listBackups(request, machine);
             } else {
                 throw methodNotAllowed("GET, PUT");
             }
+        } else if (backupPath.equals(PENDING_DIR) || backupPath.startsWith(PENDING_DIR + "/")) {
+            handlePending(request, auth, machine, backupPath.substring(PENDING_DIR.length()));
         } else {
             requireMethod(request, "GET");
             if (!auth.checkPermission("read:" + machine)) throw forbidden("read:" + machine);
-            browse(request, machineDirectory, backupPath);
+            browse(request, machine, backupPath);
         }
+    }
+
+    private static final String PENDING_DIR = ".pending";
+    private static final Pattern PENDING_ID_PATTERN = Pattern.compile(
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+
+    /**
+     * Handles {@code /backups/:machine/.pending...}; {@code rest} is what follows {@code .pending}. The only route is
+     * {@code POST /backups/:machine/.pending/:pendingId/commit}.
+     */
+    private void handlePending(HTTPRequest request, Authorization auth, String machine, String rest) throws Exception {
+        String[] pieces = rest.split("/", -1);
+        if (pieces.length != 3 || !pieces[0].isEmpty() || !pieces[2].equals("commit")) {
+            throw new HttpError(404, "Not found");
+        }
+        requireMethod(request, "POST");
+        if (!auth.checkPermission("upload:" + machine)) throw forbidden("upload:" + machine);
+        String pendingId = pieces[1];
+        if (!PENDING_ID_PATTERN.matcher(pendingId).matches()) throw new HttpError(400, "Invalid pending ID");
+        commitManifest(request, server.getBackupRepositories().get(machine), pendingId);
     }
 
     private void listMachines(HTTPRequest request, Authorization auth) throws IOException {
         List<String> machines = new ArrayList<>();
-        File[] files = server.backupsDir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                String name = file.getName();
-                if (file.isDirectory() && isValidName(name) && auth.checkPermission("read:" + name)) {
-                    machines.add(name);
-                }
+        for (String name : server.getBackupRepositories().listNames()) {
+            if (isValidName(name) && auth.checkPermission("read:" + name)) {
+                machines.add(name);
             }
         }
         Collections.sort(machines);
         sendText(request, machines);
     }
 
-    private void listBackups(HTTPRequest request, File machineDirectory) throws IOException, HttpError {
-        if (!machineDirectory.isDirectory()) throw new HttpError(404, "Unknown machine");
+    private void listBackups(HTTPRequest request, String machine) throws IOException, HttpError {
+        BackupRepositories repositories = server.getBackupRepositories();
+        if (!repositories.exists(machine)) throw new HttpError(404, "Unknown machine");
         List<String> backups = new ArrayList<>();
-        File[] files = machineDirectory.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                String name = file.getName();
-                if (file.isFile() && isValidName(name)) backups.add(name);
-            }
+        for (BackupItem item : repositories.get(machine).getAllItems()) {
+            backups.add(item.getName());
         }
-        Collections.sort(backups);
         sendText(request, backups);
     }
 
-    private void uploadManifest(HTTPRequest request, File machineDirectory) throws Exception {
+    /**
+     * {@code PUT /backups/:machine}: stores the manifest in canonical form as a pending backup and reports which
+     * content the server still needs. The backup only becomes visible after
+     * {@link #commitManifest(HTTPRequest, BackupRepository, String) commit}.
+     */
+    private void uploadManifest(HTTPRequest request, BackupRepository repository) throws Exception {
         String contentEncoding = request.getHeader("Content-Encoding");
         boolean gzip;
         if (contentEncoding == null || contentEncoding.isEmpty() || contentEncoding.equalsIgnoreCase("identity")) {
@@ -180,7 +207,6 @@ public class RequestHandler implements HTTPResponder {
         } else {
             throw new HttpError(400, "Unsupported Content-Encoding: " + contentEncoding);
         }
-        long time = System.currentTimeMillis();
         File temporaryFile = new File(server.tmpDir, UUID.randomUUID().toString());
         File temporaryCanonicalFile = new File(server.tmpDir, UUID.randomUUID().toString());
         try {
@@ -193,34 +219,88 @@ public class RequestHandler implements HTTPResponder {
                     throw new HttpError(400, "Malformed gzip data");
                 }
             }
+            UUID snapshotUuid;
             try (BackupFile file = BackupFile.open(temporaryFile)) {
-                BackupFile.writeToFile(temporaryCanonicalFile, file.getRootDirectory());
+                DirectoryEntryDirectory root = file.getRootDirectory();
+                ExtraDataSnapshotId snapshotId = root.getExtra(ExtraDataSnapshotId.class);
+                if (snapshotId == null) throw new HttpError(400, "Manifest has no snapshot ID");
+                snapshotUuid = snapshotId.uuid;
+                BackupFile.writeToFile(temporaryCanonicalFile, root);
             } catch (IOException | RuntimeException e) {
                 throw new HttpError(400, "Malformed manifest");
             }
             temporaryFile.delete();
-            if (!machineDirectory.exists()) {
-                machineDirectory.mkdirs();
+            if (repository.get(snapshotUuid) != null) {
+                throw new HttpError(409, "This machine already has a backup with snapshot ID " + snapshotUuid);
             }
-            File targetFile = new File(server.backupsDir, TimeUtil.toString(time));
-            temporaryCanonicalFile.renameTo(targetFile);
-            Set<String> missingContent = new HashSet<>();
-            List<String> lines = new ArrayList<>();
-            BiConsumer<String, String> missingContentHandler = (contentId, path) -> {
-                if (!missingContent.add(contentId)) return;
-                lines.add(contentId + ":" + path);
-            };
-            try (BackupFile file = BackupFile.open(temporaryCanonicalFile)) {
-                scanForMissingContent("", file.getRootDirectory(), server.getDataRepository(), missingContentHandler);
+            String pendingId = UUID.randomUUID().toString();
+            File pendingDirectory = repository.getPendingDirectory();
+            pendingDirectory.mkdirs();
+            File pendingFile = new File(pendingDirectory, pendingId);
+            if (!temporaryCanonicalFile.renameTo(pendingFile)) {
+                throw new IOException("Could not move manifest to " + pendingFile);
             }
-            sendText(request, lines);
+            List<String> missing;
+            try (BackupFile file = BackupFile.open(pendingFile)) {
+                missing = findMissingContent(file.getRootDirectory(), null);
+            }
+            JsonObject response = new JsonObject();
+            response.addProperty("pendingId", pendingId);
+            response.add("missing", toJsonArray(missing));
+            sendJson(request, response);
         } finally {
             if (temporaryFile.exists()) temporaryFile.delete();
             if (temporaryCanonicalFile.exists()) temporaryCanonicalFile.delete();
         }
     }
 
-    private void browse(HTTPRequest request, File machineDirectory, String backupPath) throws Exception {
+    /**
+     * {@code POST /backups/:machine/.pending/:pendingId/commit}: turns a pending manifest into a listed backup once
+     * all of its content is on the server.
+     */
+    private void commitManifest(HTTPRequest request, BackupRepository repository, String pendingId) throws Exception {
+        // One commit per machine at a time, so the duplicate and name checks below can't race.
+        synchronized (repository) {
+            File pendingFile = new File(repository.getPendingDirectory(), pendingId);
+            if (!pendingFile.isFile()) throw new HttpError(404, "No such pending backup");
+            List<StoredData> referenced = new ArrayList<>();
+            List<String> missing;
+            UUID snapshotUuid;
+            try (BackupFile file = BackupFile.open(pendingFile)) {
+                DirectoryEntryDirectory root = file.getRootDirectory();
+                ExtraDataSnapshotId snapshotId = root.getExtra(ExtraDataSnapshotId.class);
+                if (snapshotId == null) throw new IOException("Pending manifest " + pendingFile + " has no snapshot ID");
+                snapshotUuid = snapshotId.uuid;
+                missing = findMissingContent(root, referenced);
+            }
+            if (!missing.isEmpty()) {
+                JsonObject response = new JsonObject();
+                response.addProperty("error", "Content is still missing");
+                response.add("missing", toJsonArray(missing));
+                request.response.setHeader("409 " + reasonPhrase(409));
+                sendJson(request, response);
+                return;
+            }
+            if (repository.get(snapshotUuid) != null) {
+                throw new HttpError(409, "This machine already has a backup with snapshot ID " + snapshotUuid);
+            }
+            // Protect the content from garbage collection before the backup that needs it becomes visible.
+            for (StoredData storedData : referenced) storedData.touch();
+            // Backup names have one-second resolution; move on to the next free second if this one is taken.
+            long time = System.currentTimeMillis();
+            while (repository.get(TimeUtil.toString(time)) != null
+                    || new File(repository.getDirectory(), TimeUtil.toString(time)).exists()) {
+                time += 1000L;
+            }
+            BackupItem item = repository.add(pendingFile, time);
+            if (item == null) throw new IOException("Could not add " + pendingFile + " to " + repository.getName());
+            JsonObject response = new JsonObject();
+            response.addProperty("backup", item.getName());
+            sendJson(request, response);
+        }
+    }
+
+    private void browse(HTTPRequest request, String machine, String backupPath) throws Exception {
         boolean endsWithSlash = backupPath.endsWith("/");
         if (endsWithSlash) backupPath = backupPath.substring(0, backupPath.length() - 1);
         String[] pathPieces = backupPath.split("/", -1);
@@ -231,9 +311,11 @@ public class RequestHandler implements HTTPResponder {
                 throw new HttpError(400, "Invalid path");
             }
         }
-        File backupFile = new File(machineDirectory, pathPieces[0]);
-        if (!backupFile.isFile()) throw new HttpError(404, "Unknown backup");
-        try (BackupFile backup = BackupFile.open(backupFile)) {
+        BackupRepositories repositories = server.getBackupRepositories();
+        if (!repositories.exists(machine)) throw new HttpError(404, "Unknown machine");
+        BackupItem item = repositories.get(machine).get(pathPieces[0]);
+        if (item == null) throw new HttpError(404, "Unknown backup");
+        try (BackupFile backup = BackupFile.open(item.getFile())) {
             DirectoryEntry targetFile = backup.getRootDirectory();
             for (int i = 1; i < pathPieces.length; i++) {
                 if (!targetFile.isDirectory()) throw new HttpError(404, "No such path");
@@ -313,8 +395,22 @@ public class RequestHandler implements HTTPResponder {
         request.response.write(bytes);
     }
 
+    private static void sendJson(HTTPRequest request, JsonElement json) throws IOException {
+        byte[] bytes = (GSON.toJson(json) + "\n").getBytes(StandardCharsets.UTF_8);
+        request.response.setContentType("application/json; charset=utf-8");
+        request.response.contentLength(bytes.length);
+        request.response.write(bytes);
+    }
+
+    private static JsonArray toJsonArray(List<String> strings) {
+        JsonArray array = new JsonArray();
+        for (String string : strings) array.add(string);
+        return array;
+    }
+
     /**
-     * Sends an error response with a {@code text/plain} body. This is the only place error statuses are written.
+     * Sends an error response with a {@code text/plain} body. This is the only place error statuses are written,
+     * except for a commit's {@code 409} for missing content, which sends JSON so clients can read the missing list.
      */
     static void sendError(HTTPRequest request, int status, String message, Map<String, String> headers) throws IOException {
         request.response.setHeader(status + " " + reasonPhrase(status));
@@ -401,20 +497,32 @@ public class RequestHandler implements HTTPResponder {
         }
     }
 
-    private void scanForMissingContent(String path, DirectoryEntryDirectory rootDirectory, DataRepository repository, BiConsumer<String, String> missingContentHandler) {
-        for (DirectoryEntry entry : rootDirectory) {
+    /**
+     * Returns the IDs of content the tree references but the data repository doesn't have, each once, in the order
+     * they're first found.
+     *
+     * @param referenced if not null, receives every referenced {@link StoredData} that exists, each once
+     */
+    private List<String> findMissingContent(DirectoryEntryDirectory root, List<StoredData> referenced) {
+        Set<String> seen = new HashSet<>();
+        List<String> missing = new ArrayList<>();
+        findMissingContent(root, server.getDataRepository(), seen, missing, referenced);
+        return missing;
+    }
+
+    private static void findMissingContent(DirectoryEntryDirectory directory, DataRepository repository,
+                                           Set<String> seen, List<String> missing, List<StoredData> referenced) {
+        for (DirectoryEntry entry : directory) {
             if (entry.isDirectory()) {
-                String subPath = path + entry.getName() + "/";
-                scanForMissingContent(subPath, entry.asDirectory(), repository, missingContentHandler);
+                findMissingContent(entry.asDirectory(), repository, seen, missing, referenced);
             } else if (entry.isFile()) {
-                String filePath = path + entry.getName();
-                DirectoryEntryFile file = entry.asFile();
-                for (FileContent content : file) {
+                for (FileContent content : entry.asFile()) {
                     StoredData storedData = content.getStoredData(repository);
-                    if (storedData != null) {
-                        if (storedData.dataExists()) {
-                            missingContentHandler.accept(storedData.getContentId(), filePath);
-                        }
+                    if (storedData == null || !seen.add(storedData.getContentId())) continue;
+                    if (!storedData.dataExists()) {
+                        missing.add(storedData.getContentId());
+                    } else if (referenced != null) {
+                        referenced.add(storedData);
                     }
                 }
             }

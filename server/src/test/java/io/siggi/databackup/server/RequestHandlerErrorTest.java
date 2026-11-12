@@ -31,6 +31,7 @@ class RequestHandlerErrorTest {
 
     private static final String BACKUP = "2026-01-02-03-04-05";
     private static final String MISSING_HASH = "ab".repeat(32);
+    private static final String CORRUPT_HASH = "abcdab" + "0".repeat(58);
 
     private ServerTestHarness harness;
 
@@ -308,9 +309,11 @@ class RequestHandlerErrorTest {
 
     @Test
     void unexpectedErrorGives500() throws Exception {
-        Files.writeString(harness.dataDir().resolve("backups/laptop/2025-01-01-00-00-00"), "corrupt");
-        HttpResponse<String> response = harness.get("/backups/laptop/2025-01-01-00-00-00/",
-                harness.createToken("read:laptop"));
+        // Content metadata naming an unknown compression makes the content store throw.
+        Path metadata = harness.dataDir().resolve("repository/abc/dab/" + CORRUPT_HASH + ".metadata");
+        Files.createDirectories(metadata.getParent());
+        Files.writeString(metadata, "compression=bogus\n");
+        HttpResponse<String> response = harness.get("/content/" + CORRUPT_HASH, harness.createToken("globalread"));
         assertError(500, response);
         // No stack traces or internals in the body; those go to the server log.
         assertEquals("Internal server error\n", response.body());
