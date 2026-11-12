@@ -43,7 +43,7 @@ public final class ServerConfig {
     private String bindAddress = null;
     private int port = DEFAULT_PORT;
     /**
-     * The default retention policy (applied in the retention step).
+     * The default retention policy, applied by pruning (see the {@code retention} package).
      */
     private Retention retention = new Retention();
     /**

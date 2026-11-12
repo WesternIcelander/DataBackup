@@ -5,6 +5,7 @@ import io.siggi.databackup.auth.simple.SimpleAuthorizer;
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.osutils.OS;
 import io.siggi.databackup.server.repository.BackupRepositories;
+import io.siggi.databackup.server.retention.Pruner;
 import io.siggi.http.HTTPServer;
 import io.siggi.http.HTTPServerBuilder;
 
@@ -13,6 +14,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.ZoneId;
+import java.util.List;
 
 public class DataBackupServer implements AutoCloseable {
     final File root;
@@ -207,7 +210,39 @@ public class DataBackupServer implements AutoCloseable {
         }
     }
 
-    private void cleanup() {
+    /**
+     * The hourly maintenance run: prunes every machine's backups by its retention policy.
+     */
+    void cleanup() {
+        try {
+            logPruneResults(prune(false));
+        } catch (RuntimeException e) {
+            System.err.println("Pruning failed:");
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Applies the retention policies from the config to every machine's backups, counting days, weeks and months in
+     * the system's default time zone.
+     *
+     * @param dryRun if true, only work out what would be deleted
+     */
+    public List<Pruner.MachineResult> prune(boolean dryRun) {
+        return createPruner(backupRepositories, config).pruneAll(dryRun);
+    }
+
+    static Pruner createPruner(BackupRepositories repositories, ServerConfig config) {
+        return new Pruner(repositories, config, ZoneId.systemDefault(), RequestHandler::isValidName);
+    }
+
+    private static void logPruneResults(List<Pruner.MachineResult> results) {
+        for (Pruner.MachineResult result : results) {
+            if (result.deleted().isEmpty() && result.failed().isEmpty()) continue;
+            System.err.println("Pruned " + result.machine() + ": deleted " + result.deleted().size()
+                    + " backup(s), kept " + result.kept().size()
+                    + (result.failed().isEmpty() ? "" : ", could not delete " + String.join(", ", result.failed())));
+        }
     }
 
     public ServerConfig getConfig() {

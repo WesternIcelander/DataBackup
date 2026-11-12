@@ -6,7 +6,10 @@ import io.siggi.databackup.data.extra.ExtraDataSnapshotId;
 import io.siggi.databackup.util.TimeUtil;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -109,6 +112,34 @@ public class BackupRepository {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    /**
+     * Deletes the manifests of the given backups, then reloads this repository. Items that belong to another
+     * repository are skipped.
+     *
+     * @return the items whose manifest could not be deleted
+     */
+    public List<BackupItem> delete(Collection<BackupItem> items) {
+        List<BackupItem> failed = new ArrayList<>();
+        writeLock.lock();
+        try {
+            for (BackupItem item : items) {
+                if (item.getRepository() != this) {
+                    failed.add(item);
+                    continue;
+                }
+                try {
+                    Files.deleteIfExists(item.getFile().toPath());
+                } catch (IOException e) {
+                    failed.add(item);
+                }
+            }
+            reload();
+        } finally {
+            writeLock.unlock();
+        }
+        return failed;
     }
 
     private void add(BackupItem item) {

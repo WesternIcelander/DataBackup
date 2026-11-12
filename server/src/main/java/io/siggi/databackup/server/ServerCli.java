@@ -3,6 +3,9 @@ package io.siggi.databackup.server;
 import io.siggi.databackup.auth.simple.SimpleTokenStore;
 import io.siggi.databackup.auth.simple.SimpleTokenStore.CreatedToken;
 import io.siggi.databackup.auth.simple.SimpleTokenStore.TokenInfo;
+import io.siggi.databackup.server.repository.BackupRepositories;
+import io.siggi.databackup.server.retention.Pruner;
+import io.siggi.databackup.server.retention.RetentionPolicy;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,8 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The server's command line: {@code serve} (the default), {@code token create|list|revoke} and {@code help}. The data
- * folder is chosen by {@link DataBackupServer#defaultDataRoot()} ({@code -Ddatabackupdir=...}).
+ * The server's command line: {@code serve} (the default), {@code token create|list|revoke}, {@code prune} and
+ * {@code help}. The data folder is chosen by {@link DataBackupServer#defaultDataRoot()} ({@code -Ddatabackupdir=...}).
  */
 final class ServerCli {
 
@@ -29,6 +32,10 @@ final class ServerCli {
                                                       Create a token and print it. It is shown only once.
               token list                              List tokens: id, name, creation time and permissions.
               token revoke <id>                       Revoke a token by its id (or by its file's SHA-256).
+              prune [--dry-run]                       Delete backups that the retention policies in server.json
+                                                      don't keep. --dry-run only lists them. A running server
+                                                      also prunes every hour, and doesn't see backups deleted
+                                                      here until it restarts.
               help                                    Show this help.
 
             Permissions: upload:<machine>, read:<machine>, upload:*, read:*, globalread, admin.
@@ -52,6 +59,8 @@ final class ServerCli {
                     return serve(dataRoot, err);
                 case "token":
                     return token(args, dataRoot, out, err);
+                case "prune":
+                    return prune(args, dataRoot, out, err);
                 case "help":
                 case "--help":
                 case "-h":
@@ -96,6 +105,44 @@ final class ServerCli {
                 + dataRoot.getAbsolutePath());
         server.awaitTermination();
         return OK;
+    }
+
+    private static int prune(String[] args, File dataRoot, PrintStream out, PrintStream err) throws IOException {
+        boolean dryRun = false;
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].equals("--dry-run")) {
+                dryRun = true;
+            } else {
+                return usage(err, "Unexpected argument: " + args[i]);
+            }
+        }
+        if (!dataRoot.isDirectory()) {
+            err.println("Data folder does not exist: " + dataRoot.getPath());
+            return FAILED;
+        }
+        ServerConfig config = ServerConfig.load(dataRoot);
+        BackupRepositories repositories = new BackupRepositories(new File(dataRoot, "backups"));
+        List<Pruner.MachineResult> results = DataBackupServer.createPruner(repositories, config).pruneAll(dryRun);
+        if (results.isEmpty()) {
+            out.println("No machines.");
+            return OK;
+        }
+        boolean failed = false;
+        for (Pruner.MachineResult result : results) {
+            RetentionPolicy policy = result.policy();
+            out.println(result.machine() + ": keeping " + result.kept().size() + ", "
+                    + (dryRun ? "would delete " : "deleted ") + result.deleted().size()
+                    + " (keepLast " + policy.keepLast() + ", keepDaily " + policy.keepDaily()
+                    + ", keepWeekly " + policy.keepWeekly() + ", keepMonthly " + policy.keepMonthly() + ")");
+            for (String name : result.deleted()) {
+                out.println("  " + (dryRun ? "would delete " : "deleted ") + name);
+            }
+            for (String name : result.failed()) {
+                err.println("  could not delete " + result.machine() + "/" + name);
+                failed = true;
+            }
+        }
+        return failed ? FAILED : OK;
     }
 
     private static int token(String[] args, File dataRoot, PrintStream out, PrintStream err) throws IOException {
