@@ -3,6 +3,7 @@ package io.siggi.databackup.auth.simple;
 import io.siggi.databackup.auth.Authorization;
 
 import java.util.Collection;
+import java.util.Collections;
 
 public class SimpleAuthorization implements Authorization {
 
@@ -24,6 +25,13 @@ public class SimpleAuthorization implements Authorization {
     @Override
     public String getName() {
         return name;
+    }
+
+    /**
+     * Returns the permission strings exactly as granted in the token file.
+     */
+    public Collection<String> getPermissions() {
+        return Collections.unmodifiableCollection(permissions);
     }
 
     @Override

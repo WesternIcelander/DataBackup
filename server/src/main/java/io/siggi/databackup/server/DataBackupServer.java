@@ -16,6 +16,7 @@ import java.net.Socket;
 
 public class DataBackupServer implements AutoCloseable {
     final File root;
+    private final ServerConfig config;
     private final BackupRepositories backupRepositories;
     final File tmpDir;
     private final DataRepository dataRepository;
@@ -30,26 +31,46 @@ public class DataBackupServer implements AutoCloseable {
     private volatile boolean shutdown = false;
 
     /**
-     * Creates a server that reads its tokens from the {@code tokens} folder in {@code root}.
+     * Creates a server that reads its settings from {@code server.json} and its tokens from the {@code tokens}
+     * folder in {@code root}.
      *
      * @param root            the data folder
-     * @param listenerAddress the address to listen on, or {@code null} for port 8080 on all interfaces. Port 0 picks
-     *                        a free port; see {@link #getPort()}.
+     * @param listenerAddress the address to listen on, or {@code null} for the bind address and port from
+     *                        {@code server.json} (port 8080 on all interfaces by default). Port 0 picks a free port;
+     *                        see {@link #getPort()}.
      */
     public DataBackupServer(File root, InetSocketAddress listenerAddress) throws IOException {
         this(root, listenerAddress, null);
     }
 
     /**
-     * Creates a server.
+     * Creates a server that reads its settings from {@code server.json} in {@code root}.
      *
      * @param root            the data folder
-     * @param listenerAddress the address to listen on, or {@code null} for port 8080 on all interfaces. Port 0 picks
-     *                        a free port; see {@link #getPort()}.
+     * @param listenerAddress the address to listen on, or {@code null} for the bind address and port from
+     *                        {@code server.json} (port 8080 on all interfaces by default). Port 0 picks a free port;
+     *                        see {@link #getPort()}.
      * @param authorizer      the authorizer to check tokens with, or {@code null} to use a {@link SimpleAuthorizer}
      *                        on the {@code tokens} folder in {@code root}
      */
     public DataBackupServer(File root, InetSocketAddress listenerAddress, Authorizer authorizer) throws IOException {
+        this(root, listenerAddress, authorizer, ServerConfig.load(root));
+    }
+
+    /**
+     * Creates a server with the given settings instead of reading {@code server.json}.
+     *
+     * @param root            the data folder
+     * @param listenerAddress the address to listen on, or {@code null} for the config's bind address and port. Port 0
+     *                        picks a free port; see {@link #getPort()}.
+     * @param authorizer      the authorizer to check tokens with, or {@code null} to use a {@link SimpleAuthorizer}
+     *                        on the {@code tokens} folder in {@code root}
+     * @param config          the server settings, or {@code null} for the defaults
+     */
+    public DataBackupServer(File root, InetSocketAddress listenerAddress, Authorizer authorizer, ServerConfig config)
+            throws IOException {
+        if (config == null) config = ServerConfig.defaults();
+        this.config = config;
         this.root = root;
         this.backupRepositories = new BackupRepositories(new File(root, "backups"));
         this.tmpDir = new File(root, "tmp");
@@ -59,9 +80,10 @@ public class DataBackupServer implements AutoCloseable {
         }
         File dataRepositoryRoot = new File(root, "repository");
         this.dataRepository = new DataRepository(dataRepositoryRoot);
+        this.dataRepository.setCompressionPolicy(config.getCompressionPolicy());
         this.contentReceiver = new ContentReceiver(dataRepository, tmpDir);
         if (listenerAddress == null) {
-            listenerAddress = new InetSocketAddress(8080);
+            listenerAddress = config.getListenerAddress();
         }
         this.listenerAddress = listenerAddress;
         this.httpServer = new HTTPServerBuilder().build();
@@ -81,26 +103,23 @@ public class DataBackupServer implements AutoCloseable {
     }
 
     public static void main(String[] args) throws Exception {
+        System.exit(ServerCli.run(args, System.out, System.err));
+    }
+
+    /**
+     * Returns the data folder: the {@code databackupdir} system property if set, else {@code ./databackup} if it
+     * exists, else the OS default.
+     */
+    static File defaultDataRoot() {
         String dataBackupDir = System.getProperty("databackupdir");
-        File dataRoot;
-        if (dataBackupDir != null) {
-            dataRoot = new File(dataBackupDir);
-        } else {
-            dataRoot = new File("databackup");
-            if (!dataRoot.exists()) {
-                dataRoot = switch (OS.get()) {
-                    case WINDOWS -> new File("C:\\ProgramData\\DataBackup");
-                    case MACOS -> new File("/Library/Application Support/DataBackup");
-                    default -> new File("/var/lib/databackup");
-                };
-            }
-        }
-        if (!dataRoot.exists() && !dataRoot.mkdirs()) {
-            System.err.println("Required directory does not exist: " + dataRoot.getPath());
-            System.exit(1);
-            return;
-        }
-        new DataBackupServer(dataRoot, null).start();
+        if (dataBackupDir != null) return new File(dataBackupDir);
+        File dataRoot = new File("databackup");
+        if (dataRoot.exists()) return dataRoot;
+        return switch (OS.get()) {
+            case WINDOWS -> new File("C:\\ProgramData\\DataBackup");
+            case MACOS -> new File("/Library/Application Support/DataBackup");
+            default -> new File("/var/lib/databackup");
+        };
     }
 
     /**
@@ -147,6 +166,18 @@ public class DataBackupServer implements AutoCloseable {
     }
 
     /**
+     * Waits until the server has stopped accepting connections, after {@link #shutdown()} or a fatal error. Returns
+     * at once if the server was never started.
+     */
+    public void awaitTermination() throws InterruptedException {
+        Thread listener;
+        synchronized (this) {
+            listener = listenerThread;
+        }
+        if (listener != null) listener.join();
+    }
+
+    /**
      * Same as {@link #shutdown()}.
      */
     @Override
@@ -177,6 +208,10 @@ public class DataBackupServer implements AutoCloseable {
     }
 
     private void cleanup() {
+    }
+
+    public ServerConfig getConfig() {
+        return config;
     }
 
     public DataRepository getDataRepository() {

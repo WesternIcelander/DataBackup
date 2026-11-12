@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class SimpleAuthorizer implements Authorizer {
@@ -21,13 +21,19 @@ public class SimpleAuthorizer implements Authorizer {
         this.tokenDirectory = tokenDirectory;
     }
 
+    /**
+     * Returns the hex SHA-256 of a token, which names its token file ({@code <hash>.txt}).
+     */
+    public static String hashToken(String authToken) {
+        MessageDigest sha256 = Util.sha256();
+        sha256.update(authToken.getBytes(StandardCharsets.UTF_8));
+        return Util.bytesToHex(sha256.digest());
+    }
+
     @Override
     public SimpleAuthorization getAuthorization(String authToken) {
         if (authToken == null) return null;
-        MessageDigest sha256 = Util.sha256();
-        sha256.update(authToken.getBytes(StandardCharsets.UTF_8));
-        byte[] digest = sha256.digest();
-        String hashedToken = Util.bytesToHex(digest);
+        String hashedToken = hashToken(authToken);
         File tokenFile = new File(tokenDirectory, hashedToken + ".txt");
         if (!tokenFile.exists()) return null;
         try {
@@ -37,11 +43,11 @@ public class SimpleAuthorizer implements Authorizer {
         }
     }
 
-    private SimpleAuthorization readTokenFile(File tokenFile) throws IOException {
+    static SimpleAuthorization readTokenFile(File tokenFile) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(tokenFile), StandardCharsets.UTF_8))) {
             String userId = null;
             String name = null;
-            Set<String> permissions = new HashSet<>();
+            Set<String> permissions = new LinkedHashSet<>();
 
             String line;
             while ((line = reader.readLine()) != null) {
