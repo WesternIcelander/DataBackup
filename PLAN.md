@@ -67,7 +67,14 @@ These are settled; don't revisit them inside a step.
   - Add one trivial test in `common` to prove the setup works.
   - Done when `mvn -o -q test` passes from the repo root and runs that test.
 
-- [ ] **Fix `BackupFile.open` and `TimeUtil.fromString`, which are broken against SiggiTools**
+- [x] **Fix `BackupFile.open` and `TimeUtil.fromString`, which are broken against SiggiTools**
+  - Done: `6ed49e6` (2026-11-12). Switched to SiggiTools' `FilePointer` and `RafOutputStream` and removed DataBackup's
+    `FilePointer`, `RafOutputStream`, `RafInputStream` and `CountingInputStream` (nothing else used them).
+    `TimeUtil.fromString` returns `-1` for null or invalid input. Both in-place writers now buffer each `write()` in
+    the new `PositionedBufferOutputStream` and write it through a fresh `data.writeTo(position)`; they also refuse
+    read-only data up front. Tests: `BackupFileTest` (the interleaving test fails against the old writers; it needs a
+    manifest bigger than the 8 KiB read buffer to show the bug) and `TimeUtilTest`. Still unsafe: two writers open at
+    once on the same `BackupFile` both start at the same end-of-file offset, so keep to one open writer at a time.
   - `BackupFile.open` always throws `ClassCastException`. It casts the stream from `RandomAccessData.getInputStream`
     to DataBackup's own `io.siggi.databackup.util.stream.FilePointer`, but since `RandomAccessData` moved to
     SiggiTools (commit `af87b2e`), the stream implements `io.siggi.tools.io.FilePointer`. Use the SiggiTools interface.
@@ -280,6 +287,31 @@ These are settled; don't revisit them inside a step.
   - Add a test-only entry point that builds a manifest from plain temp folders without snapshots. It must not be
     reachable from the CLI. Use it to test the layout and hash reuse.
 
+- [ ] **(manual) Prepare an APFS snapshot smoke test for the user**
+  - Agents can't run this: APFS snapshots need root, and `sudo` asks for a password. **Don't wait for the user and
+    don't block the run.** Prepare everything, mark the step `- [~]`, and return ok so the workflow continues. No
+    later step may depend on this one's result.
+  - Write `docs/manual-checks/macos-apfs-smoke.sh`, a single script the user runs with `sudo` that:
+    - Builds nothing itself; uses the jars or classes already built by the agent (say in the script header which
+      `mvn` command to run first if they're missing).
+    - Creates a small test folder on the Data volume, then, through the client's real snapshot and scan code (not
+      shell commands), creates an APFS snapshot, mounts it, scans the test folder inside the snapshot into a manifest,
+      unmounts it and deletes it.
+    - Checks the manifest lists the test files with the right sizes and hashes, and that no snapshot or mount is left
+      behind (`tmutil listlocalsnapshots /`, `mount`).
+    - Also runs `snapshots cleanup` after a run killed partway through (start it in the background, `kill -9` it
+      after the snapshot is created).
+    - Prints a clear `PASS`/`FAIL` line per check and writes all output to
+      `/Users/siggi/Desktop/java/DataBackup/target/manual-checks/macos-apfs-smoke.log` (`target` is gitignored), so
+      an agent can read the results later.
+    - Is safe to run more than once, and cleans up its test folder and any snapshot it created even when a check
+      fails.
+  - Check that the script at least parses (`bash -n`) and that every non-root part works (for example, run it
+    without `sudo` and confirm it refuses with a clear message).
+  - In the `- [~]` note, give the one command the user needs to run.
+  - When the user reports back, or the log file exists: read the log, add fix steps right after this one for any
+    `FAIL`, and mark this step `- [x]` only when everything passes.
+
 - [ ] **Upload the backup and implement the `backup` command**
   - `databackup backup`:
     1. Clean up stale snapshots.
@@ -377,13 +409,24 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 6: Real-platform checks
 
-- [ ] **(manual) Run an end-to-end check on macOS with APFS**
-  - Agent preparation: build the jars. Write a sample `client.json` with a small source on the Data volume and a
-    local server data folder. Write the exact commands for the user to run as root (the server, then
-    `sudo java -jar client.jar backup`, then `list`, then `restore` to a temp folder, then a `diff -r` of the result).
-    Also check that the APFS snapshot is gone afterwards (`tmutil listlocalsnapshots /` or `diskutil apfs
-    listSnapshots`), and that `snapshots cleanup` handles a run killed with Ctrl-C.
-  - Put the instructions in `docs/manual-checks/macos.md`, then mark the step `- [~]` as `CLAUDE.md` describes.
+- [ ] **(manual) Prepare the macOS end-to-end check for the user**
+  - **Don't wait for the user and don't block the run.** Prepare everything, mark the step `- [~]`, and return ok so
+    the workflow continues. No later step may depend on this one's result.
+  - Build the jars, then write `docs/manual-checks/macos-e2e.sh`, a single script the user runs with `sudo` that:
+    - Starts a server on a temp data folder on this Mac and writes a `client.json` with a small test source on the
+      Data volume (with a symlink, an empty file, odd permissions and a non-ASCII name).
+    - Runs `backup`, then `list`, then `restore` to a temp folder, then compares with `diff -r` plus permissions and
+      modified times.
+    - Changes one file, backs up again, and checks that only that file's content was uploaded.
+    - Checks the APFS snapshot is gone afterwards (`tmutil listlocalsnapshots /` or `diskutil apfs listSnapshots`),
+      and that `snapshots cleanup` cleans up after a backup killed with `kill -9`.
+    - Prints `PASS`/`FAIL` per check, writes all output to
+      `/Users/siggi/Desktop/java/DataBackup/target/manual-checks/macos-e2e.log`, stops the server, and cleans up
+      even when a check fails. It must be safe to run more than once.
+  - Check that the script parses and that it refuses to run without `sudo`. In the `- [~]` note, give the one command
+    the user needs to run.
+  - When the user reports back, or the log file exists: read the log, add fix steps right after this one for any
+    `FAIL`, and mark this step `- [x]` only when everything passes.
 
 - [ ] **Run an end-to-end check on Linux with btrfs (test VM)**
   - Use `databackup-ubuntu` (see "Test VMs" in `CLAUDE.md`). Revert it first.
