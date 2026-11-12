@@ -153,7 +153,18 @@ These are settled; don't revisit them inside a step.
     - Offers small helpers for HTTP calls through `java.net.http.HttpClient`.
   - Add one smoke test: a request without a token is rejected.
 
-- [ ] **Add proper HTTP error responses and permission checks**
+- [x] **Add proper HTTP error responses and permission checks**
+  - Done: `5e375a3` (2026-11-12). `RequestHandler` throws `HttpError` and `sendError` writes every error as
+    `text/plain` (401 adds `WWW-Authenticate: Bearer`, 405 adds `Allow`); unexpected exceptions are logged and become
+    `500`, missing file content is `503`. Permissions are checked before existence (no `read:<m>` gives `403` even for
+    unknown machines); `/upload` needs any `upload:<m>` via new `Authorization.checkAnyPermission`. Machine and backup
+    names must match `[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}`, content IDs `[0-9a-f]{64}`, path pieces can't be empty,
+    `.` or `..`. Beyond the plan, to make the 404s and permissions real: `GET /backups/` lists only readable machines,
+    `GET /backups/:m/` lists files in that machine's folder, backups are opened from the machine folder (not
+    `backupsDir`), browsing now descends, and a missing `Content-Encoding` no longer throws. No route has a conflict
+    yet, so `409` is first used and tested in the upload/commit step. Still open for later steps: the PUT body after
+    parsing (wrong folder, renamed file, gives `500` today), `BackupRepository` wiring, `returnStoredData` crashes,
+    and content upload sending no response. Tests: `server` `RequestHandlerErrorTest`.
   - In `RequestHandler`, replace every silent `return` with a response:
     - `401` when the token is missing or invalid.
     - `403` when the token lacks the permission.
