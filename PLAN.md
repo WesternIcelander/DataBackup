@@ -314,7 +314,16 @@ These are settled; don't revisit them inside a step.
     - Override with `--config`.
   - Validate the config with clear error messages. Tests for parsing and validation.
 
-- [ ] **Add an HTTP API client for the server**
+- [x] **Add an HTTP API client for the server**
+  - Done: `8224b24` (2026-11-12). `client/.../client/api/ServerApi` (`builder(url, token)` or `forConfig(config)`)
+    with `uploadManifest(machine, Path)`, `uploadContent(List<ContentSource>)` (`ofFile`/`ofStream`/`ofBytes`;
+    result's `notReceived` lists expected IDs the server didn't report, i.e. the source changed after hashing),
+    `commit` (throws `MissingContentException` on the missing-content `409`), `listMachines`, `listBackups`
+    (`BackupInfo`), `listDirectory(machine, backup, "a/b")`, `downloadManifest`/`downloadFile` (to a `Path`, via a temp
+    file; gzip accepted). Errors are `ServerApiException` (status + message); connection errors, truncated bodies and
+    5xx retry per `RetryPolicy` (default 5 attempts, 1s doubling to 30s). `server` now builds a test-jar, which
+    `client` uses (test scope) for `ServerTestHarness`. A retried commit whose first response was lost can answer
+    `404`/`409`; the orchestration step should then check `listBackups` for its snapshot ID.
   - `ServerApi` class built on `java.net.http.HttpClient`, with:
     - `uploadManifest(machine, file)` (gzipped; returns the pending ID and missing list).
     - `uploadContent(List<Path or stream, contentId>)` (multipart, batched by count and size).
