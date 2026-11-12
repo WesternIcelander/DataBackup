@@ -123,7 +123,11 @@ These are settled; don't revisit them inside a step.
       predicate excludes paths, and `copyHashes` skips re-hashing unchanged files.
   - Fix any bugs the tests uncover, in this step if they're small; otherwise add them as new plan steps.
 
-- [ ] **Stop `BackupFile.writeToFile` from changing the tree it writes**
+- [x] **Stop `BackupFile.writeToFile` from changing the tree it writes**
+  - Done: `bc20078` (2026-11-12). `Serialization` tracks placeholder positions locally; `serializeDirectoryEntry` now
+    returns its placeholder position (or -1) instead of setting it on the entry, also when used by `updateEntries`.
+    `DirectoryEntryDirectoryMerge` already wrote copies, so merges weren't affected; writing an opened tree directly
+    was. Tests in `BackupFileTest` (opened tree nested under a new root, and a merge of two opened files).
   - `Serialization.serializeDirectory`/`serializeDirectoryEntry` call `setFileContentOffsetOffset`,
     `setFileContentOffset` and `setDirectoryOffsetOffset` on the entries being written. When the tree comes from an
     open `BackupFile` (for example writing a `DirectoryEntryDirectoryMerge` of two opened manifests, which the server
