@@ -3,6 +3,7 @@ package io.siggi.databackup.data;
 import io.siggi.databackup.data.content.FileContent;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.util.stream.IO;
+import io.siggi.databackup.util.stream.PositionedBufferOutputStream;
 import io.siggi.databackup.util.ObjectWriter;
 import io.siggi.databackup.util.ReadingIterator;
 import io.siggi.tools.io.RandomAccessData;
@@ -138,19 +139,27 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
                 }
             };
         }
+        if (!data.isWritable()) throw new IOException("File is open in read-only mode.");
         fileContents = null;
         fileContentsReference = null;
         long newOffset = data.getLength();
-        OutputStream out = data.writeTo(newOffset);
-        IO.writeInt(out, 0); // placeholder
+        PositionedBufferOutputStream placeholder = new PositionedBufferOutputStream(newOffset);
+        IO.writeInt(placeholder, 0); // placeholder
+        long startPosition = placeholder.writeTo(data);
         return new ObjectWriter<>() {
             boolean closed = false;
             int count = 0;
+            // Each write goes through a fresh data.writeTo(position), because reads made between writes move the
+            // shared file pointer of RandomAccessDataFile.
+            long position = startPosition;
+
             @Override
             public void write(FileContent value) throws IOException {
                 if (closed) throw new IOException("Already closed.");
+                PositionedBufferOutputStream out = new PositionedBufferOutputStream(position);
                 IO.writeShort(out, value.getTypeId());
                 value.write(out);
+                position = out.writeTo(data);
                 count += 1;
             }
 
@@ -158,7 +167,6 @@ public class DirectoryEntryFile extends DirectoryEntry implements Iterable<FileC
             public void close() throws IOException {
                 if (closed) return;
                 closed = true;
-                out.close();
                 try (OutputStream countStream = data.writeTo(newOffset)) {
                     IO.writeInt(countStream, count);
                 }

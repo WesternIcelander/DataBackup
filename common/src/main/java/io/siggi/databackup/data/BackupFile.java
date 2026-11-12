@@ -1,8 +1,8 @@
 package io.siggi.databackup.data;
 
-import io.siggi.databackup.util.stream.FilePointer;
+import io.siggi.tools.io.FilePointer;
 import io.siggi.databackup.util.stream.IO;
-import io.siggi.databackup.util.stream.RafOutputStream;
+import io.siggi.tools.io.RafOutputStream;
 import io.siggi.databackup.util.Serialization;
 import io.siggi.tools.io.RandomAccessData;
 import io.siggi.tools.io.RandomAccessDataFile;

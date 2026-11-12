@@ -1,7 +1,8 @@
 package io.siggi.databackup.data;
 
-import io.siggi.databackup.util.stream.FilePointer;
+import io.siggi.tools.io.FilePointer;
 import io.siggi.databackup.util.stream.IO;
+import io.siggi.databackup.util.stream.PositionedBufferOutputStream;
 import io.siggi.databackup.util.ObjectWriter;
 import io.siggi.databackup.util.ReadingIterator;
 import io.siggi.databackup.util.Serialization;
@@ -129,23 +130,30 @@ public class DirectoryEntryDirectoryDisk extends DirectoryEntryDirectory {
 
     @Override
     public ObjectWriter<DirectoryEntry> updateEntries() throws IOException {
+        if (!data.isWritable()) throw new IOException("File is open in read-only mode.");
         softEntries = null;
         long newOffset = data.getLength();
-        OutputStream out = data.writeTo(newOffset);
         return new ObjectWriter<>() {
             boolean closed = false;
+            // Each write goes through a fresh data.writeTo(position), because reads made between writes move the
+            // shared file pointer of RandomAccessDataFile.
+            long position = newOffset;
+
             @Override
             public void write(DirectoryEntry entry) throws IOException {
                 if (closed) throw new IOException("Already closed.");
+                PositionedBufferOutputStream out = new PositionedBufferOutputStream(position);
                 Serialization.serializeDirectoryEntry(out, entry);
+                position = out.writeTo(data);
             }
 
             @Override
             public void close() throws IOException {
                 if (closed) return;
                 closed = true;
+                PositionedBufferOutputStream out = new PositionedBufferOutputStream(position);
                 out.write(Serialization.DIRECTORY_ENTRY_END);
-                out.close();
+                position = out.writeTo(data);
                 long offsetOffset = getDirectoryOffsetOffset();
                 try (OutputStream offsetUpdater = data.writeTo(offsetOffset)) {
                     IO.writeLong(offsetUpdater, newOffset - offsetOffset);

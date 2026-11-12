@@ -2,12 +2,9 @@ package io.siggi.databackup.util;
 
 import io.siggi.tools.SimpleDateTime;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
-import java.util.TimeZone;
 
 public class TimeUtil {
     private static final SimpleDateTime sdt;
@@ -21,7 +18,17 @@ public class TimeUtil {
         return sdt.format(time);
     }
 
+    /**
+     * Parses a time created by {@link #toString(long)}.
+     *
+     * @return the time in milliseconds, or -1 if {@code time} is null or not a valid time
+     */
     public static long fromString(String time) {
-        return sdt.parse(time);
+        if (time == null) return -1L;
+        try {
+            return sdt.parse(time);
+        } catch (DateTimeException e) {
+            return -1L;
+        }
     }
 }
