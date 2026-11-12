@@ -470,7 +470,12 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 3: Restore
 
-- [ ] **Add the `list` command**
+- [x] **Add the `list` command**
+  - Done: `aee033c` (2026-11-12). New `client/.../ListCommand` (output lines `<f|d|l|?> <perms> <size> <modified>
+    <name>`, times in the local zone; a file or symlink path lists just that entry by looking it up in its parent).
+    `ListCommand.resolveBackup(api, machine, "latest")` picks the newest backup client-side (the server has no
+    `latest`); restore should reuse it. A machine without backups gives the server's `404 Unknown machine`. Tests:
+    `client` `ListCommandTest`.
   - `databackup list` lists the machines the token can read. `databackup list <machine>` lists that machine's
     backups (name and time). `databackup list <machine> <backup> [path]` lists a directory inside a backup (type,
     size, modified time, name).
