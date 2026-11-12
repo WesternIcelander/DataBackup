@@ -1,10 +1,18 @@
 package io.siggi.databackup.datarepository;
 
+import io.siggi.databackup.util.compression.CompressionAlgorithm;
+import io.siggi.databackup.util.compression.DataCompression;
+
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -126,9 +134,50 @@ public class StoredData {
         if (!file.renameTo(newFile)) return false;
         if (setCompression(compression)) {
             if (!originalFile.equals(newFile)) originalFile.delete();
+            this.file = newFile;
             return true;
         }
         return false;
+    }
+
+    /**
+     * Stores uncompressed content, compressing it first when the repository's {@link CompressionPolicy} says it
+     * helps. When it doesn't (the filename shows an already-compressed format, or compressing saves too little), the
+     * content is stored as-is and marked {@link #setDoNotCompress() do-not-compress}.
+     *
+     * @param file     the uncompressed content; it is moved into the repository (or deleted) on success. A
+     *                 compressed copy is written next to it temporarily, so it should be on the same filesystem as
+     *                 the repository.
+     * @param filename the content's filename, if known, used to skip already-compressed formats
+     * @return whether the content was stored
+     */
+    public boolean storeCompressing(File file, String filename) throws IOException {
+        CompressionPolicy policy = repository.getCompressionPolicy();
+        if (isDoNotCompress() || !policy.shouldTry(filename)) {
+            return storeUncompressed(file);
+        }
+        CompressionAlgorithm algorithm = DataCompression.getCompressionAlgorithm(CompressionPolicy.ALGORITHM);
+        File compressed = new File(file.getParentFile(), file.getName() + "." + algorithm.fileExtension());
+        try {
+            try (InputStream in = new FileInputStream(file);
+                 OutputStream out = algorithm.compress(new BufferedOutputStream(new FileOutputStream(compressed)))) {
+                in.transferTo(out);
+            }
+            if (!policy.isWorthKeeping(file.length(), compressed.length())) {
+                return storeUncompressed(file);
+            }
+            if (!store(compressed, CompressionPolicy.ALGORITHM)) return false;
+            file.delete();
+            return true;
+        } finally {
+            if (compressed.exists()) compressed.delete();
+        }
+    }
+
+    private boolean storeUncompressed(File file) {
+        if (!store(file, null)) return false;
+        setDoNotCompress();
+        return true;
     }
 
     public boolean dataExists() {

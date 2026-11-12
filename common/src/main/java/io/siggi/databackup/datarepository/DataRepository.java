@@ -7,9 +7,23 @@ import java.io.IOException;
 
 public class DataRepository {
     private final File root;
+    private volatile CompressionPolicy compressionPolicy = CompressionPolicy.defaults();
 
     public DataRepository(File root) {
         this.root = root;
+    }
+
+    /**
+     * The policy {@link StoredData#storeCompressing(File, String)} follows. Defaults to
+     * {@link CompressionPolicy#defaults()}.
+     */
+    public CompressionPolicy getCompressionPolicy() {
+        return compressionPolicy;
+    }
+
+    public void setCompressionPolicy(CompressionPolicy compressionPolicy) {
+        if (compressionPolicy == null) throw new NullPointerException("compressionPolicy");
+        this.compressionPolicy = compressionPolicy;
     }
 
     public StoredDataStream openStream() throws IOException {

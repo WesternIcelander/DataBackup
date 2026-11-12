@@ -70,16 +70,17 @@ public class ContentReceiver {
                 // One content ID at a time, so two uploads of the same content can't interleave their metadata
                 // updates.
                 synchronized (lockFor(contentId)) {
+                    String filename = baseName(part.getFilename());
                     if (storedData.dataExists()) {
                         alreadyPresent.add(contentId);
-                    } else if (storedData.store(tmpFile, null)) {
+                    } else if (storedData.storeCompressing(tmpFile, filename)) {
+                        // Compressed with gzip when that saves enough; see the repository's CompressionPolicy.
                         stored.add(contentId);
                     } else {
                         throw new IOException("Could not store content " + contentId);
                     }
                     // Starts (or restarts) the garbage-collection grace period for this content.
                     storedData.touch();
-                    String filename = baseName(part.getFilename());
                     if (filename != null) storedData.addKnownFilename(filename);
                 }
             } finally {
