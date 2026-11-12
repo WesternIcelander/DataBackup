@@ -16,6 +16,7 @@ is implemented now. The backup client uses it to upload backups, and to list, br
 | `GET`  | `/backups/:machine/:backup?manifest`             | `read:<machine>`              | Download a backup's raw manifest             |
 | `GET`  | `/backups/:machine/:backup/[path/]`              | `read:<machine>`              | List a directory inside a backup             |
 | `GET`  | `/backups/:machine/:backup/path/to/file`         | `read:<machine>`              | Download a file from a backup                |
+| `GET`  | `/ui/...`                                        | see [Web UI](#web-ui)         | Read-only web UI for browsers                |
 
 A typical backup run is:
 
@@ -38,7 +39,8 @@ Every request needs a token, sent either as
 
 If both are present, the header wins. A missing or empty token gives `401 Missing token`, and an unknown or revoked
 token gives `401 Invalid token`; both responses carry `WWW-Authenticate: Bearer`. The token is checked before
-anything else, so even an unknown route answers `401` without a valid token.
+anything else, so even an unknown route answers `401` without a valid token. The one exception is the web UI under
+`/ui/` (see [Web UI](#web-ui)), which sends a browser without a valid token to its login page instead.
 
 Tokens are created, listed and revoked with the server's command line (`token create`, `token list`,
 `token revoke`; see `java -jar databackup-server.jar help`). They are stored in the data folder's `tokens/` folder as
@@ -333,8 +335,43 @@ Downloads a file from a backup.
 - **Errors:** as for directory listings, plus `503 Some of this file's content is missing on the server`. A file
   whose stored contents overlap or run past its size gives `500`.
 
+## Web UI
+
+A read-only, server-rendered HTML interface for browsing backups and downloading files. It uses no JavaScript.
+
+| Method          | Path                                     | Token needed | Purpose                                              |
+|-----------------|------------------------------------------|--------------|------------------------------------------------------|
+| `GET`           | `/ui`                                    | no           | Redirects (`303`) to `/ui/`                          |
+| `GET`           | `/ui/login`                              | no           | Login form (redirects to `/ui/` when logged in)      |
+| `POST`          | `/ui/login`                              | no           | Log in with form field `token`                       |
+| `GET`, `POST`   | `/ui/logout`                             | no           | Clears the cookie, redirects to `/ui/login`          |
+| `GET`           | `/ui/style.css`                          | no           | The pages' stylesheet                                |
+| `GET`           | `/ui/`                                   | yes          | The machines the token can read                      |
+| `GET`           | `/ui/backups/:machine/`                  | `read:<m>`   | The machine's backups, newest first                  |
+| `GET`           | `/ui/backups/:machine/:backup/[path/]`   | `read:<m>`   | A directory: name, size, modified time, permissions  |
+
+- **Login:** `POST /ui/login` with `application/x-www-form-urlencoded` body `token=<token>`. A valid token answers
+  `303` to `/ui/` with `Set-Cookie: token=<percent-encoded token>; Path=/; HttpOnly; SameSite=Strict`, plus `Secure`
+  when the request came over HTTPS (or through a proxy sending `X-Forwarded-Proto: https`). The cookie is a session
+  cookie and also authenticates the API routes, so the UI's file links go straight to
+  `GET /backups/:machine/:backup/path/to/file`. An empty token gives `400`, an invalid one `401`, both with the login
+  form again and no cookie. Any valid token can log in; it sees only the machines its `read:` permissions allow.
+- **Pages without a valid token** answer `303` to `/ui/login`; a cookie holding an invalid or revoked token is
+  cleared on the way.
+- **Browsing:** a directory without its trailing slash redirects to the slash form, and a file's `/ui/backups/...`
+  path redirects to its download route. Folders are listed first, then files and symlinks (shown with their target),
+  each sorted by name. Times are shown in UTC.
+- **Errors** are HTML pages with the same statuses as the API: `400` for invalid names or paths, `403` without
+  `read:<machine>` (before any existence check), `404` for unknown machines, backups, paths and pages, `405` for
+  other methods.
+- **Headers:** every page is `text/html; charset=utf-8` with `Content-Security-Policy: default-src 'self';
+  base-uri 'none'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store`. Every name is HTML-escaped
+  and every link piece percent-encoded. Downloaded backup content keeps the API's rule of never being sent as HTML.
+
 ## Unknown routes and methods
 
-- Any path other than those above gives `404 Not found` (with a valid token), including `/`.
+- Any path other than those above gives `404 Not found` (with a valid token), including `/`. Unknown pages under
+  `/ui/` give an HTML `404` page.
 - A known path with the wrong method gives `405` with an `Allow` header: `POST` for `/upload` and commits, `GET` for
   `/content/...`, `/backups/` and paths inside backups, `GET, PUT` for `/backups/:machine`.

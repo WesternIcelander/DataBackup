@@ -40,10 +40,12 @@ public class RequestHandler implements HTTPResponder {
 
     RequestHandler(DataBackupServer server, Authorizer authorizer) {
         this.server = server;
+        this.webUi = new WebUi(this, server);
         setAuthorizer(authorizer);
     }
 
     private final DataBackupServer server;
+    private final WebUi webUi;
     private Authorizer authorizer;
 
     public void setAuthorizer(Authorizer authorizer) {
@@ -84,12 +86,25 @@ public class RequestHandler implements HTTPResponder {
         }
     }
 
+    /**
+     * Looks up a token, returning null when it isn't valid.
+     */
+    Authorization authorize(String token) {
+        return authorizer.getAuthorization(token);
+    }
+
     private void route(HTTPRequest request) throws Exception {
         String token = getAuthToken(request);
+        if (WebUi.handles(request.url)) {
+            // The web UI handles missing or invalid tokens itself, by sending the browser to its login page.
+            Authorization auth = token == null || token.isEmpty() ? null : authorize(token);
+            webUi.handle(request, token, auth);
+            return;
+        }
         if (token == null || token.isEmpty()) {
             throw new HttpError(401, "Missing token").header("WWW-Authenticate", "Bearer");
         }
-        Authorization auth = authorizer.getAuthorization(token);
+        Authorization auth = authorize(token);
         if (auth == null) {
             throw new HttpError(401, "Invalid token").header("WWW-Authenticate", "Bearer");
         }
@@ -603,7 +618,7 @@ public class RequestHandler implements HTTPResponder {
         request.response.write(body);
     }
 
-    private static String reasonPhrase(int status) {
+    static String reasonPhrase(int status) {
         return switch (status) {
             case 400 -> "Bad Request";
             case 401 -> "Unauthorized";
