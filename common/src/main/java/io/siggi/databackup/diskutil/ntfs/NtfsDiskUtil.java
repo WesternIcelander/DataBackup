@@ -3,12 +3,8 @@ package io.siggi.databackup.diskutil.ntfs;
 import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
-import io.siggi.databackup.diskutil.btrfs.BtrfsSnapshotSerializer;
-import io.siggi.databackup.util.Util;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -17,13 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class NtfsDiskUtil implements DiskUtil {
-
-    static final String WMIC_PATH = "C:\\Windows\\System32\\wbem\\WMIC.exe";
-    static final String VSSADMIN_PATH = "C:\\Windows\\System32\\vssadmin.exe";
 
     private NtfsDiskUtil() {
     }
@@ -83,38 +74,13 @@ public class NtfsDiskUtil implements DiskUtil {
     }
 
     private NtfsSnapshot createSnapshot(String drive) throws SnapshotException {
-        try {
-            Process process = Runtime.getRuntime().exec(new String[] {
-                    WMIC_PATH,
-                    "shadowcopy",
-                    "call",
-                    "create",
-                    "Volume=" + drive
-            });
-            UUID snapshotUuid = null;
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.contains("ShadowID")) {
-                        Matcher matcher = Util.uuidPattern.matcher(line);
-                        if (matcher.find()) {
-                            snapshotUuid = UUID.fromString(matcher.group());
-                        }
-                    }
-                }
-            }
-            if (snapshotUuid == null) {
-                if (process.waitFor() != 0) {
-                    throw new SnapshotException(Util.getErrorString(process));
-                }
-                throw new SnapshotException("Unable to create snapshot, wmic output did not contain ShadowID.");
-            }
-            return getSnapshot(snapshotUuid);
-        } catch (SnapshotException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new SnapshotException("Unable to create snapshot.", e);
+        UUID snapshotUuid = VssCim.create(drive);
+        NtfsSnapshot snapshot = getSnapshot(snapshotUuid);
+        if (snapshot == null) {
+            throw new SnapshotException("Created shadow copy {" + snapshotUuid + "} of " + drive
+                    + " but it isn't in the list of shadow copies.");
         }
+        return snapshot;
     }
 
     private boolean validateDrive(String drive) {
@@ -130,17 +96,18 @@ public class NtfsDiskUtil implements DiskUtil {
     private static final Map<UUID, NtfsSnapshot> snapshotCacheBySnapshotId = new HashMap<>();
     private static final Map<UUID, String> cacheMountPoints = new HashMap<>();
 
-    static boolean invalidateSnapshotCache(long maxAge) {
+    static synchronized boolean invalidateSnapshotCache(long maxAge) {
         if (maxAge == 0L || System.currentTimeMillis() - snapshotCacheTime >= maxAge) {
             snapshotCacheTime = 0L;
             snapshotCache.clear();
             snapshotCacheBySnapshotId.clear();
+            cacheMountPoints.clear();
             return true;
         }
         return false;
     }
 
-    static List<NtfsSnapshot> listSnapshots(UUID volumeId) {
+    static synchronized List<NtfsSnapshot> listSnapshots(UUID volumeId) throws SnapshotException {
         if (invalidateSnapshotCache(10000L)) {
             buildSnapshotCache();
         }
@@ -149,7 +116,7 @@ public class NtfsDiskUtil implements DiskUtil {
         return Collections.unmodifiableList(ntfsSnapshots);
     }
 
-    static NtfsSnapshot getSnapshot(UUID snapshotId) {
+    static synchronized NtfsSnapshot getSnapshot(UUID snapshotId) throws SnapshotException {
         NtfsSnapshot snapshot = snapshotCacheBySnapshotId.get(snapshotId);
         if (snapshot != null) return snapshot;
         invalidateSnapshotCache(0L);
@@ -157,7 +124,7 @@ public class NtfsDiskUtil implements DiskUtil {
         return snapshotCacheBySnapshotId.get(snapshotId);
     }
 
-    static String getMountPoint(UUID snapshotId) {
+    static synchronized String getMountPoint(UUID snapshotId) throws SnapshotException {
         String mountPoint = cacheMountPoints.get(snapshotId);
         if (mountPoint != null) return mountPoint;
         invalidateSnapshotCache(0L);
@@ -165,38 +132,15 @@ public class NtfsDiskUtil implements DiskUtil {
         return cacheMountPoints.get(snapshotId);
     }
 
-    private static void buildSnapshotCache() {
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{
-                    VSSADMIN_PATH,
-                    "list",
-                    "shadows"
-            });
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                UUID shadowCopyUuid = null;
-                while ((line = reader.readLine()) != null) {
-                    if (line.contains("Shadow Copy ID: ")) {
-                        Matcher uuidMatcher = Util.uuidPattern.matcher(line);
-                        if (uuidMatcher.find()) {
-                            shadowCopyUuid = UUID.fromString(uuidMatcher.group());
-                        }
-                    } else if (line.contains("Original Volume: ")) {
-                        Matcher uuidMatcher = Util.uuidPattern.matcher(line);
-                        if (uuidMatcher.find()) {
-                            UUID volumeUuid = UUID.fromString(uuidMatcher.group());
-                            NtfsSnapshot snapshot = new NtfsSnapshot(volumeUuid, shadowCopyUuid);
-                            List<NtfsSnapshot> ntfsSnapshots = snapshotCache.computeIfAbsent(volumeUuid, u -> new ArrayList<>());
-                            ntfsSnapshots.add(snapshot);
-                            snapshotCacheBySnapshotId.put(shadowCopyUuid, snapshot);
-                        }
-                    } else if (line.contains("Shadow Copy Volume: ")) {
-                        String value = line.substring(line.indexOf(": ") + 2).trim();
-                        cacheMountPoints.put(shadowCopyUuid, value);
-                    }
-                }
+    private static void buildSnapshotCache() throws SnapshotException {
+        for (VssCim.ShadowCopy shadowCopy : VssCim.list()) {
+            NtfsSnapshot snapshot = new NtfsSnapshot(shadowCopy.volumeId(), shadowCopy.id());
+            snapshotCache.computeIfAbsent(shadowCopy.volumeId(), u -> new ArrayList<>()).add(snapshot);
+            snapshotCacheBySnapshotId.put(shadowCopy.id(), snapshot);
+            if (shadowCopy.deviceObject() != null) {
+                cacheMountPoints.put(shadowCopy.id(), shadowCopy.deviceObject());
             }
-        } catch (Exception e) {
         }
+        snapshotCacheTime = System.currentTimeMillis();
     }
 }

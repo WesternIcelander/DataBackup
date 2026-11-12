@@ -3,7 +3,6 @@ package io.siggi.databackup.diskutil.ntfs;
 import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
-import io.siggi.databackup.util.Util;
 
 import java.io.File;
 import java.util.UUID;
@@ -54,22 +53,10 @@ public class NtfsSnapshot implements Snapshot {
     @Override
     public void delete() throws SnapshotException {
         try {
-            Process process = Runtime.getRuntime().exec(new String[] {
-                    NtfsDiskUtil.VSSADMIN_PATH,
-                    "delete",
-                    "shadows",
-                    "/Shadow={" + shadowCopyId().toString() + "}",
-                    "/Quiet"
-            });
-            if (process.waitFor() != 0) {
-                throw new SnapshotException(Util.getErrorString(process));
-            }
-        } catch (SnapshotException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new SnapshotException("Unable to delete snapshot.", e);
+            VssCim.delete(shadowCopyId);
+        } finally {
+            NtfsDiskUtil.invalidateSnapshotCache(0L);
         }
-        NtfsDiskUtil.invalidateSnapshotCache(0L);
     }
 
     @Override
