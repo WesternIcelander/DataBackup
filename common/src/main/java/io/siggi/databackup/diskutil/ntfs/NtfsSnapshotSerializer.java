@@ -19,8 +19,8 @@ public class NtfsSnapshotSerializer implements SnapshotSerializer {
     @Override
     public NtfsSnapshot deserialize(JsonObject object) {
         return new NtfsSnapshot(
-                UUID.fromString(object.get("volumeId").toString()),
-                UUID.fromString(object.get("shadowCopyId").toString())
+                UUID.fromString(object.get("volumeId").getAsString()),
+                UUID.fromString(object.get("shadowCopyId").getAsString())
         );
     }
 

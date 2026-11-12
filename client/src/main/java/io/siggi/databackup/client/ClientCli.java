@@ -2,6 +2,7 @@ package io.siggi.databackup.client;
 
 import io.siggi.databackup.client.Arguments.UsageException;
 import io.siggi.databackup.client.ClientConfig.ConfigException;
+import io.siggi.databackup.client.snapshot.SnapshotPlatform;
 
 import java.io.PrintStream;
 import java.nio.file.InvalidPathException;
@@ -52,6 +53,11 @@ final class ClientCli {
     }
 
     static int run(String[] args, ClientPaths defaults, PrintStream out, PrintStream err) {
+        return run(args, defaults, SnapshotPlatform.system(), out, err);
+    }
+
+    static int run(String[] args, ClientPaths defaults, SnapshotPlatform platform, PrintStream out,
+                   PrintStream err) {
         String config = null;
         int i = 0;
         // Options before the command.
@@ -124,8 +130,19 @@ final class ClientCli {
             return CONFIG_ERROR;
         }
 
-        String fullCommand = command.equals("snapshots") ? "snapshots cleanup" : command;
-        return notImplemented(fullCommand, clientConfig, err);
+        switch (command) {
+            case "backup":
+                return SnapshotCommands.backup(clientConfig, platform, snapshots -> {
+                    // Scanning and uploading come in later plan steps.
+                    err.println("Scanning and uploading are not implemented yet; the snapshots were taken and will"
+                            + " now be deleted (config " + clientConfig.getConfigFile() + " is valid).");
+                    return FAILED;
+                }, out, err);
+            case "snapshots":
+                return SnapshotCommands.cleanup(clientConfig, platform, out, err);
+            default:
+                return notImplemented(command, clientConfig, err);
+        }
     }
 
     static ClientConfig loadConfig(String configArg, ClientPaths defaults) throws ConfigException {

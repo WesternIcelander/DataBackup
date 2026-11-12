@@ -1,15 +1,33 @@
 package io.siggi.databackup.client;
 
+import com.google.gson.JsonObject;
+import io.siggi.databackup.client.snapshot.SnapshotPlatform;
+import io.siggi.databackup.diskutil.DiskUtil;
+import io.siggi.databackup.diskutil.MountedDisk;
+import io.siggi.databackup.diskutil.Snapshot;
+import io.siggi.databackup.diskutil.SnapshotException;
+import io.siggi.databackup.diskutil.SnapshotSerializer;
+import io.siggi.databackup.osutils.OS;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClientCliTest {
@@ -25,9 +43,13 @@ class ClientCliTest {
     }
 
     private Result run(String... args) {
+        return run(new FakeCliPlatform(), args);
+    }
+
+    private Result run(SnapshotPlatform platform, String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = ClientCli.run(args, defaults(), new PrintStream(out, true, StandardCharsets.UTF_8),
+        int code = ClientCli.run(args, defaults(), platform, new PrintStream(out, true, StandardCharsets.UTF_8),
                 new PrintStream(err, true, StandardCharsets.UTF_8));
         return new Result(code, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
     }
@@ -99,11 +121,231 @@ class ClientCliTest {
                 {"restore", "m", "latest", "/a", dir.resolve("out").toString(), "--overwrite", "--config=" + file},
                 {"snapshots", "cleanup", "--config", file.toString()}}) {
             Result r = run(args);
-            // The commands themselves come in later steps; the config must have been read and accepted.
+            // The config must have been read and accepted. Scanning, list and restore come in later steps.
+            if (args[0].equals("snapshots")) {
+                assertEquals(ClientCli.OK, r.exitCode(), r.err());
+                assertTrue(r.out().contains("No leftover snapshots."), r.out());
+                continue;
+            }
             assertEquals(ClientCli.FAILED, r.exitCode(), r.err());
+            if (List.of(args).contains("backup")) {
+                // The fake platform says the source doesn't exist.
+                assertTrue(r.err().contains("These sources can't be snapshotted"), r.err());
+                continue;
+            }
             assertTrue(r.err().contains("not implemented yet"), r.err());
             assertTrue(r.err().contains(file.toString()), r.err());
         }
+    }
+
+    /**
+     * A Linux system where {@code dir/src} is a btrfs subvolume, with snapshots kept in memory.
+     */
+    private static final class FakeCliPlatform implements SnapshotPlatform {
+        final Set<String> existing = new HashSet<>();
+        final List<String> log = new ArrayList<>();
+        String subvolume;
+        boolean failDelete;
+
+        @Override
+        public OS os() {
+            return OS.LINUX;
+        }
+
+        @Override
+        public List<MountedDisk> mounts() {
+            return List.of(new MountedDisk("/dev/sda2", "/", "btrfs", List.of("rw")));
+        }
+
+        @Override
+        public Path realPath(Path path) throws IOException {
+            if (!path.toString().equals(subvolume)) throw new IOException("no such file");
+            return path;
+        }
+
+        @Override
+        public boolean isDirectory(Path path) {
+            return path.toString().equals(subvolume);
+        }
+
+        @Override
+        public String checkBtrfsSubvolume(Path path) {
+            return path.toString().equals(subvolume) ? null : "not a subvolume";
+        }
+
+        @Override
+        public String windowsFileSystemType(Path driveRoot) throws IOException {
+            throw new IOException("not Windows");
+        }
+
+        @Override
+        public DiskUtil diskUtil(String fileSystemType) {
+            return fileSystemType.equals("btrfs") ? diskUtil : null;
+        }
+
+        final DiskUtil diskUtil = new DiskUtil() {
+            @Override
+            public String filesystem() {
+                return "btrfs";
+            }
+
+            @Override
+            public SnapshotSerializer serializer() {
+                return new SnapshotSerializer() {
+                    @Override
+                    public Snapshot deserialize(JsonObject object) {
+                        return snapshot(object.get("path").getAsString());
+                    }
+
+                    @Override
+                    public JsonObject serialize(Snapshot snapshot) {
+                        JsonObject object = new JsonObject();
+                        object.addProperty("path", snapshot.toString());
+                        return object;
+                    }
+                };
+            }
+
+            @Override
+            public boolean supportsSnapshots() {
+                return true;
+            }
+
+            @Override
+            public boolean snapshotsRequireDestination() {
+                return true;
+            }
+
+            @Override
+            public Map<String, Snapshot> createSnapshots(Collection<String> filesystems,
+                                                         Function<String, String> destination) {
+                Map<String, Snapshot> result = new HashMap<>();
+                for (String fs : filesystems) {
+                    String path = destination.apply(fs);
+                    existing.add(path);
+                    log.add("create " + path);
+                    result.put(fs, snapshot(path));
+                }
+                return result;
+            }
+        };
+
+        Snapshot snapshot(String path) {
+            return new Snapshot() {
+                @Override
+                public DiskUtil diskUtil() {
+                    return diskUtil;
+                }
+
+                @Override
+                public String mountedPath() {
+                    return path;
+                }
+
+                @Override
+                public boolean isMounted() {
+                    return existing.contains(path);
+                }
+
+                @Override
+                public String mount() {
+                    return path;
+                }
+
+                @Override
+                public void unmount() {
+                }
+
+                @Override
+                public void delete() throws SnapshotException {
+                    if (failDelete) throw new SnapshotException("device busy");
+                    existing.remove(path);
+                    log.add("delete " + path);
+                }
+
+                @Override
+                public boolean isValid() {
+                    return existing.contains(path);
+                }
+
+                @Override
+                public String toString() {
+                    return path;
+                }
+            };
+        }
+    }
+
+    @Test
+    void backupTakesAndDeletesSnapshots() throws Exception {
+        Path file = writeConfig("custom.json");
+        FakeCliPlatform platform = new FakeCliPlatform();
+        platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
+        Result r = run(platform, "--config", file.toString(), "backup");
+        // Scanning and uploading come in the next steps.
+        assertEquals(ClientCli.FAILED, r.exitCode(), r.err());
+        assertTrue(r.err().contains("Scanning and uploading are not implemented yet"), r.err());
+        assertEquals(2, platform.log.size(), platform.log.toString());
+        assertTrue(platform.log.get(0).startsWith("create " + dir.resolve("state").resolve("snapshots")
+                .resolve("Data-")), platform.log.toString());
+        assertEquals(platform.log.get(0).replace("create", "delete"), platform.log.get(1));
+        assertTrue(platform.existing.isEmpty());
+        assertTrue(r.out().contains("Snapshot of Data"), r.out());
+        assertTrue(r.out().contains("Deleted snapshot of Data"), r.out());
+        assertFalse(Files.exists(dir.resolve("state").resolve("snapshots.json")));
+    }
+
+    @Test
+    void failedDeleteIsReportedAndCleanedUpLater() throws Exception {
+        Path file = writeConfig("custom.json");
+        FakeCliPlatform platform = new FakeCliPlatform();
+        platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
+        platform.failDelete = true;
+        Result r = run(platform, "--config", file.toString(), "backup");
+        assertEquals(ClientCli.FAILED, r.exitCode());
+        assertTrue(r.err().contains("Some snapshots couldn't be deleted"), r.err());
+        assertTrue(r.err().contains("device busy"), r.err());
+        assertEquals(1, platform.existing.size());
+        assertTrue(Files.exists(dir.resolve("state").resolve("snapshots.json")));
+
+        Result cleanup = run(platform, "--config", file.toString(), "snapshots", "cleanup");
+        assertEquals(ClientCli.FAILED, cleanup.exitCode());
+        assertTrue(cleanup.err().contains("couldn't be deleted"), cleanup.err());
+
+        platform.failDelete = false;
+        cleanup = run(platform, "--config", file.toString(), "snapshots", "cleanup");
+        assertEquals(ClientCli.OK, cleanup.exitCode(), cleanup.err());
+        assertTrue(cleanup.out().contains("Cleaned up 1 leftover snapshot."), cleanup.out());
+        assertTrue(platform.existing.isEmpty());
+        assertFalse(Files.exists(dir.resolve("state").resolve("snapshots.json")));
+    }
+
+    @Test
+    void backupCleansUpLeftoversFirst() throws Exception {
+        Path file = writeConfig("custom.json");
+        FakeCliPlatform platform = new FakeCliPlatform();
+        platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
+        platform.failDelete = true;
+        run(platform, "--config", file.toString(), "backup");
+        String leftover = platform.existing.iterator().next();
+        platform.failDelete = false;
+        platform.log.clear();
+        Result r = run(platform, "--config", file.toString(), "backup");
+        assertEquals("delete " + leftover, platform.log.get(0), platform.log.toString());
+        assertTrue(r.out().contains("Deleted leftover snapshot of Data"), r.out());
+        assertTrue(platform.existing.isEmpty());
+    }
+
+    @Test
+    void backupRefusesSourcesThatCantBeSnapshotted() throws Exception {
+        Path file = writeConfig("custom.json");
+        FakeCliPlatform platform = new FakeCliPlatform();
+        platform.subvolume = "/somewhere/else";
+        Result r = run(platform, "--config", file.toString(), "backup");
+        assertEquals(ClientCli.FAILED, r.exitCode());
+        assertTrue(r.err().contains("These sources can't be snapshotted:"), r.err());
+        assertTrue(r.err().contains("Source \"Data\""), r.err());
+        assertTrue(platform.log.isEmpty());
     }
 
     @Test
