@@ -1,0 +1,14 @@
+# Starts databackup-client.service every day. See databackup-client.service for installing.
+
+[Unit]
+Description=Daily DataBackup client backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+# Spread runs out a little so many machines don't hit the server at the same moment.
+RandomizedDelaySec=30min
+# If the machine was off at 03:00, run once soon after it boots.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

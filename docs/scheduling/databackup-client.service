@@ -1,0 +1,24 @@
+# One DataBackup client run on Linux. Started daily by databackup-client.timer; it runs as root, which btrfs
+# snapshots need. Install with:
+#
+#   sudo cp databackup-client.service databackup-client.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now databackup-client.timer
+#
+# Run a backup now with `sudo systemctl start databackup-client.service`; read its output with
+# `journalctl -u databackup-client.service`. See README.md in this folder.
+
+[Unit]
+Description=DataBackup client backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+# systemd looks for `java` in /usr/local/bin, /usr/bin and the other standard folders; give a full path if your
+# Java is installed elsewhere.
+ExecStart=java -jar /opt/databackup/databackup-client.jar backup
+# Back up in the background without slowing the machine down much.
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<!--
+  Daily DataBackup client run on Windows, as SYSTEM with highest privileges (VSS shadow copies need them).
+  Import it from an elevated Command Prompt or PowerShell:
+
+    schtasks /Create /TN "DataBackup client" /XML databackup-client-task.xml
+
+  It expects java.exe on the system PATH and the jar in C:\ProgramData\DataBackup-client. Output is appended to
+  C:\ProgramData\DataBackup-client\client.log. See README.md in this folder.
+-->
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Backs up this computer's DataBackup sources once a day.</Description>
+    <URI>\DataBackup client</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-01-01T03:00:00</StartBoundary>
+      <RandomDelay>PT30M</RandomDelay>
+      <Enabled>true</Enabled>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <!-- S-1-5-18 is the SYSTEM account. -->
+      <UserId>S-1-5-18</UserId>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <!-- If the computer was off at 03:00, run once soon after it starts. -->
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <!-- Stop a run that is still going after 12 hours. -->
+    <ExecutionTimeLimit>PT12H</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>C:\Windows\System32\cmd.exe</Command>
+      <Arguments>/c java.exe -jar "C:\ProgramData\DataBackup-client\databackup-client.jar" backup &gt;&gt; "C:\ProgramData\DataBackup-client\client.log" 2&gt;&amp;1</Arguments>
+    </Exec>
+  </Actions>
+</Task>

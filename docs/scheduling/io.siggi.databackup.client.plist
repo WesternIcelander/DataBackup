@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily DataBackup client run on macOS. Install as a LaunchDaemon so it runs as root, which APFS snapshots need:
+
+    sudo mkdir -p /Library/Logs/DataBackup
+    sudo cp io.siggi.databackup.client.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/io.siggi.databackup.client.plist
+    sudo chmod 644 /Library/LaunchDaemons/io.siggi.databackup.client.plist
+    sudo launchctl bootstrap system /Library/LaunchDaemons/io.siggi.databackup.client.plist
+
+  See README.md in this folder for the paths it expects and how to run it once by hand.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.siggi.databackup.client</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/java</string>
+        <string>-jar</string>
+        <string>/Library/Application Support/DataBackup-client/databackup-client.jar</string>
+        <string>backup</string>
+    </array>
+
+    <!-- Every day at 03:00. If the Mac was asleep then, launchd runs it once when it wakes. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>UserName</key>
+    <string>root</string>
+
+    <!-- Run in the background at low I/O priority. -->
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Library/Logs/DataBackup/client.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Library/Logs/DataBackup/client.log</string>
+</dict>
+</plist>

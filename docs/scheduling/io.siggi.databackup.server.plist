@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs the DataBackup server on macOS at boot, restarting it if it exits. Install as a LaunchDaemon:
+
+    sudo mkdir -p /Library/Logs/DataBackup
+    sudo cp io.siggi.databackup.server.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/io.siggi.databackup.server.plist
+    sudo chmod 644 /Library/LaunchDaemons/io.siggi.databackup.server.plist
+    sudo launchctl bootstrap system /Library/LaunchDaemons/io.siggi.databackup.server.plist
+
+  The server doesn't need root. Change UserName to an account that owns the data folder (and can write the log
+  folder); root is used here only because macOS has no ready-made service account for it. See README.md in this
+  folder.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.siggi.databackup.server</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/java</string>
+        <string>-Ddatabackupdir=/Library/Application Support/DataBackup</string>
+        <string>-jar</string>
+        <string>/Library/Application Support/DataBackup/databackup-server.jar</string>
+        <string>serve</string>
+    </array>
+
+    <key>UserName</key>
+    <string>root</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <!-- Wait at least 10 seconds between restarts. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Library/Logs/DataBackup/server.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Library/Logs/DataBackup/server.log</string>
+</dict>
+</plist>

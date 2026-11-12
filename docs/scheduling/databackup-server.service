@@ -1,0 +1,31 @@
+# Runs the DataBackup server on Linux. It doesn't need root; it runs as the system user `databackup`, and systemd
+# creates /var/lib/databackup for it (StateDirectory). Install with:
+#
+#   sudo useradd --system --home-dir /var/lib/databackup --shell /usr/sbin/nologin databackup
+#   sudo cp databackup-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now databackup-server.service
+#
+# Read its output with `journalctl -u databackup-server.service`. See README.md in this folder.
+
+[Unit]
+Description=DataBackup server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=databackup
+Group=databackup
+StateDirectory=databackup
+StateDirectoryMode=0700
+# systemd looks for `java` in /usr/local/bin, /usr/bin and the other standard folders; give a full path if your
+# Java is installed elsewhere.
+ExecStart=java -Ddatabackupdir=/var/lib/databackup -jar /opt/databackup/databackup-server.jar serve
+Restart=on-failure
+RestartSec=10
+# The JVM exits with 143 when systemd stops it with SIGTERM; that is a clean stop.
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
