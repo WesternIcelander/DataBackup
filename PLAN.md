@@ -95,7 +95,10 @@ These are settled; don't revisit them inside a step.
     Open new streams after writing rather than reusing ones from before. Reusing closed streams after a write was a
     SiggiTools bug; it's fixed in `1.1-SNAPSHOT` `a0db869`, which the build uses.
 
-- [ ] **Fix `SimpleAuthorizer` token parsing and add auth tests**
+- [x] **Fix `SimpleAuthorizer` token parsing and add auth tests**
+  - Done: `90c9167` (2026-11-12). Fixed the fall-through switch; token files are read as UTF-8 with blank lines, `#`
+    comments and unknown keys ignored and keys/values trimmed. `checkPermission` treats `prefix:*` as granting any
+    `prefix:<x>` (so `read:*`/`upload:*` work; there is no bare `*`). Tests: `serverlib` `SimpleAuthorizerTest`.
   - In `serverlib/.../auth/simple/SimpleAuthorizer.java`, the `switch` in `readTokenFile` has no `break`s, so an
     `id=` line also sets the name and adds a permission. Fix it.
   - Ignore blank lines and lines starting with `#`.
