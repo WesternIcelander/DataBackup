@@ -65,6 +65,22 @@ These are settled; don't revisit them inside a step.
   - Add one trivial test in `common` to prove the setup works.
   - Done when `mvn -o -q test` passes from the repo root and runs that test.
 
+- [ ] **Fix `BackupFile.open` and `TimeUtil.fromString`, which are broken against SiggiTools**
+  - `BackupFile.open` always throws `ClassCastException`. It casts the stream from `RandomAccessData.getInputStream`
+    to DataBackup's own `io.siggi.databackup.util.stream.FilePointer`, but since `RandomAccessData` moved to
+    SiggiTools (commit `af87b2e`), the stream implements `io.siggi.tools.io.FilePointer`. Use the SiggiTools interface.
+    Check every other cast to or `instanceof` check against DataBackup's `FilePointer`, and remove DataBackup's
+    `FilePointer` if nothing else needs it.
+  - `TimeUtil.fromString` must return `-1` for invalid input, as `BackupRepository.reload` expects. SiggiTools'
+    `SimpleDateTime.parse` throws `DateTimeParseException` (or `NullPointerException` for null) instead.
+  - Add tests: write a `BackupFile`, open it read-only and writable, update entries in place, reopen, and check the
+    contents. Also test `TimeUtil` round trips and invalid input.
+  - Known SiggiTools bug, reported to the SiggiTools session on 2026-11-12: `RandomAccessDataFile` can return stale
+    bytes after `writeTo`, because closed, buffered streams are reused by later `getInputStream` calls. DataBackup's
+    in-place updates (`updateEntries` patching offsets) hit this. If the in-place update test fails because of it,
+    leave that test in place (mark it `@Disabled` with a note pointing at this bug), note it under this step, and
+    don't work around it in DataBackup. Re-enable it once a fixed SiggiTools `1.1-SNAPSHOT` is installed.
+
 - [ ] **Fix `SimpleAuthorizer` token parsing and add auth tests**
   - In `serverlib/.../auth/simple/SimpleAuthorizer.java`, the `switch` in `readTokenFile` has no `break`s, so an
     `id=` line also sets the name and adds a permission. Fix it.
