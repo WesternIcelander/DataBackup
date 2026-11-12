@@ -40,8 +40,8 @@ If a push fails, report the error and stop; don't force-push.
 
 ## Manual steps and the "awaiting verification" marker
 
-Steps marked **(manual)** need hardware, an OS, or privileges an agent doesn't have, such as a Linux machine with
-btrfs, a Windows machine, or root. Don't fake them.
+Steps marked **(manual)** need privileges an agent doesn't have, such as root on this Mac (APFS snapshots). Don't
+fake them. Linux and Windows aren't manual: use the test VMs (see below).
 
 - Do whatever preparation can be done: build the jars, write sample config, and commit any helper scripts or docs to
   `main` as usual.
@@ -56,6 +56,23 @@ btrfs, a Windows machine, or root. Don't fake them.
   on instead of stopping.
 - Only the user moves a step from `- [~]` to `- [x]`. If they report problems, add new `- [ ]` fix steps directly
   under the manual step.
+
+## Test VMs
+
+Linux (btrfs) and Windows (NTFS VSS) testing happens on two VMs reachable over SSH as `databackup-ubuntu` and
+`databackup-win10`. They're controlled (revert, start, stop) with `vmctl`. The details are in `CLAUDE.local.md` at
+the main worktree root, which isn't committed: SSH users, test paths, which Mac address the VMs should use to reach a
+server here, and PowerShell-over-SSH tips. Read it before using the VMs.
+
+- Revert a VM before using it, and stop it when you're done.
+- Never write IP addresses, tokens or other details from `CLAUDE.local.md` into `PLAN.md`, commits or docs. Both
+  branches are public.
+
+## Working across the two worktrees
+
+Agents may start in either worktree. Use absolute paths, and `git -C <worktree>` for git commands, rather than
+`cd`-ing between them. Code changes go to `/Users/siggi/Desktop/java/DataBackup` (`main`); plan updates go to
+`/Users/siggi/Desktop/java/DataBackup/plan` (`plan`).
 
 ## Running this plan with the `run-plan` workflow
 

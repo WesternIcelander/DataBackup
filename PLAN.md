@@ -240,18 +240,23 @@ These are settled; don't revisit them inside a step.
   - For each source, work out its filesystem and pick the matching `DiskUtil`:
     - macOS: `MountedDisk.getAll()`, `apfs`. The root `/` maps to `/System/Volumes/Data`, as `ApfsScanner` on
       `wip-fsscanners` does.
-    - Linux: `MountedDisk.getAll()`, `btrfs`.
+    - Linux: btrfs. A source can be any btrfs **subvolume**, not just a mount point: the test VM has `/` on btrfs and
+      the source is a subvolume inside it, which `mount` doesn't list. Detect it with `btrfs subvolume show <path>`
+      (needs root), and use the mount table only to confirm that the filesystem holding it is btrfs.
     - Windows: drive letter, NTFS. `MountedDisk.getAll()` throws on Windows, so add Windows support or detect drives
       another way.
-  - If the filesystem doesn't support snapshots, or the source isn't at the root of a snapshottable
-    volume/subvolume, fail with a clear error.
+  - If the filesystem doesn't support snapshots, or the source isn't a snapshottable volume or subvolume, fail with a
+    clear error.
   - Create snapshots for all sources first, then scan.
   - Pass a destination folder under `stateDir` when `snapshotsRequireDestination()` is true (btrfs).
   - Before scanning, write each created snapshot to `stateDir/snapshots.json` using `SnapshotSerialization`. Delete
     the snapshots in a `finally` block and remove them from the file afterwards.
   - On startup and with `snapshots cleanup`, delete any snapshots left in `snapshots.json` by a crashed run.
   - Unit-test the source-to-`DiskUtil` mapping and the bookkeeping in `snapshots.json` with a fake `DiskUtil`.
-    Real snapshots are covered by the manual platform steps in Phase 6.
+  - Test with real snapshots on the test VMs (see "Test VMs" in `CLAUDE.md`): on `databackup-ubuntu`, detect, snapshot
+    and clean up the test subvolume; on `databackup-win10`, the same for `C:`. Use a small throwaway `main` or test
+    class copied over with the jars. Check that nothing is left behind (`btrfs subvolume list /`,
+    `vssadmin list shadows`, keeping any shadow copies that existed before the run).
 
 - [ ] **Build the manifest from the scan**
   - For each source, run `FileMetadataScanner` on the snapshot's mounted path:
@@ -260,6 +265,10 @@ These are settled; don't revisit them inside a step.
     - Add the snapshot-info extra data for that filesystem.
   - Windows VSS: the root of a shadow copy can't be listed with `File.listFiles()`. List the root from the live
     drive, but read every subdirectory and file from the shadow copy. The user's VSS notes describe this workaround.
+    Verified on the test VM on 2026-11-12: `File.listFiles()` on `\\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN\`
+    returns `null`, but `...\Users` lists fine. Plain NIO (`Paths.get`) rejects `\\?\` paths entirely, so the scanner
+    depends on `WindowsPathHack` (reflection into JDK internals). Run the scanner against a real shadow copy on
+    `databackup-win10` in this step to confirm `WindowsPathHack` works on Java 17.
   - Reuse hashes: if `stateDir/last-manifest` exists for this machine, call `copyHashes` from the matching source
     directory before `fillInHashes`, so unchanged files aren't re-hashed.
   - Assemble the root directory per **Decisions** (a new `ExtraDataSnapshotId` UUID, one child directory per source)
@@ -374,18 +383,36 @@ These are settled; don't revisit them inside a step.
     listSnapshots`), and that `snapshots cleanup` handles a run killed with Ctrl-C.
   - Put the instructions in `docs/manual-checks/macos.md`, then mark the step `- [~]` as `CLAUDE.md` describes.
 
-- [ ] **(manual) Run an end-to-end check on Linux with btrfs**
-  - The same as the macOS step, on a Linux machine or VM with a btrfs subvolume as the source. Check that the
-    snapshot destination folder is on the same btrfs filesystem, and that the snapshots are removed afterwards
-    (`btrfs subvolume list`). Put the instructions in `docs/manual-checks/linux.md` and mark the step `- [~]`.
+- [ ] **Run an end-to-end check on Linux with btrfs (test VM)**
+  - Use `databackup-ubuntu` (see "Test VMs" in `CLAUDE.md`). Revert it first.
+  - Run the server on this Mac and copy the client jar and a `client.json` to the VM, pointing at the Mac. The source
+    is the test subvolume; put a few files in it first, including a symlink, an empty file, odd permissions and a
+    file with a non-ASCII name.
+  - Run `backup` as root, then `list`, then `restore` to a temp folder, then compare with `diff -r` plus permissions
+    and modified times.
+  - Change a file and back up again; check that only the changed content is uploaded.
+  - Check that the snapshot destination is on the same btrfs filesystem, and that no snapshots are left afterwards
+    (`btrfs subvolume list /`). Kill a backup partway through (`kill -9`), then check that `snapshots cleanup`
+    removes what it left behind.
+  - Fix whatever fails, in this step if small, otherwise as new steps right after this one. Stop the VM when done.
 
-- [ ] **(manual) Run an end-to-end check on Windows with NTFS VSS**
-  - The same, on Windows, run from an elevated prompt or as SYSTEM. Check:
-    - VSS creation needs System Protection and the Volume Shadow Copy service (see the user's VSS notes).
+- [ ] **Run an end-to-end check on Windows with NTFS VSS (test VM)**
+  - Use `databackup-win10` (see "Test VMs" in `CLAUDE.md`). Revert it first. The SSH session is elevated.
+  - The same flow as the Linux step: the server on this Mac, the client on the VM, backing up a test folder on `C:`.
+    Also check:
     - The root-listing workaround works.
-    - The shadow copy is deleted afterwards (`vssadmin list shadows`).
+    - The shadow copy is deleted afterwards (`vssadmin list shadows`); shadow copies that existed before the run must
+      be left alone.
     - Restore works without POSIX metadata.
-  - Put the instructions in `docs/manual-checks/windows.md` and mark the step `- [~]`.
+  - Fix whatever fails, in this step if small, otherwise as new steps right after this one. Stop the VM when done.
+
+- [ ] **Replace `wmic` for creating shadow copies**
+  - `NtfsDiskUtil` creates shadow copies with `wmic shadowcopy call create`. `wmic` is deprecated and removed from
+    newer Windows 11 builds. Switch to PowerShell's CIM (`Invoke-CimMethod -ClassName Win32_ShadowCopy -MethodName
+    Create`) or another supported way, keeping `vssadmin` (or CIM) for listing and deleting.
+  - Don't depend on English output where it can be avoided; CIM returns structured data.
+  - Verify on `databackup-win10`: create, list, mount path and delete all work, then rerun the Windows end-to-end
+    backup.
 
 ## Phase 7: Finishing
 
