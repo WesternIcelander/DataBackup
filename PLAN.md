@@ -281,7 +281,11 @@ These are settled; don't revisit them inside a step.
     - `token revoke <id>`.
   - Tests for token create, list and revoke.
 
-- [ ] **Write server API docs**
+- [x] **Write server API docs**
+  - Done: `a678b64` (2026-11-12). Added `docs/server-api.md`: auth (Bearer header or `token` cookie), permissions,
+    name/ID rules, error format and statuses, and each route (upload, content, listings, manifest upload/commit,
+    `?manifest`, browsing with text/JSON, file download). It notes that pending manifests are never cleaned up yet
+    and `admin` has no HTTP route yet; update the doc when later steps add routes (web UI, retention, GC).
   - Write `docs/server-api.md` describing every endpoint, its method, required permission, request and response
     formats, and status codes, as they are now implemented.
   - The user's private `server-api.txt` is outdated; don't edit it.
