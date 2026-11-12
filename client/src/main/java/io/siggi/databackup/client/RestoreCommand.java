@@ -234,10 +234,18 @@ final class RestoreCommand {
         out.println("Restoring " + totalFiles + " files (" + ManifestBuilder.formatBytes(totalBytes) + ") to "
                 + target + "...");
 
-        // Content first. A directory that can't be created takes its subtree with it.
+        // Content first. A directory that can't be created takes its subtree with it. Symlinks come after everything
+        // else: Windows makes a directory symlink only when its target is an existing directory at creation time.
+        List<Item> ordered = new ArrayList<>(items.size());
+        for (Item item : items) {
+            if (!item.entry().isSymlink()) ordered.add(item);
+        }
+        for (Item item : items) {
+            if (item.entry().isSymlink()) ordered.add(item);
+        }
         List<Item> written = new ArrayList<>();
         List<Path> failedDirectories = new ArrayList<>();
-        for (Item item : items) {
+        for (Item item : ordered) {
             if (Thread.interrupted()) throw new InterruptedException();
             if (insideAny(item.target(), failedDirectories)) continue;
             try {

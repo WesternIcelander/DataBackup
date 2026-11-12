@@ -26,7 +26,9 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -138,7 +140,7 @@ public class FileMetadataScanner {
                             String target = Files.readSymbolicLink(filePathO).toString();
                             DirectoryEntrySymlink symlinkEntry = new DirectoryEntrySymlink(fileName, target);
                             symlinkEntry.setParent(directoryEntry);
-                            addExtra(file, symlinkEntry);
+                            addExtra(file, filePathO, symlinkEntry);
                             if (symlinkEntry.equals(baseEntry)) {
                                 skippedEntries.add(fileName);
                                 continue;
@@ -155,7 +157,7 @@ public class FileMetadataScanner {
                         }
                         DirectoryEntryFile fileEntry = new DirectoryEntryFile(fileName, file.lastModified(), file.length());
                         fileEntry.setParent(directoryEntry);
-                        addExtra(file, fileEntry);
+                        addExtra(file, filePathO, fileEntry);
                         if (baseEntry instanceof DirectoryEntryFile baseFile && fileEntry.equalsIgnoreHash(baseFile)) {
                             skippedEntries.add(fileName);
                             continue;
@@ -169,7 +171,7 @@ public class FileMetadataScanner {
                     } else if (Files.isDirectory(filePathO, LinkOption.NOFOLLOW_LINKS)) {
                         DirectoryEntryDirectoryMemory subDirectory = new DirectoryEntryDirectoryMemory(fileName);
                         subDirectory.setParent(directoryEntry);
-                        addExtra(file, subDirectory);
+                        addExtra(file, filePathO, subDirectory);
                         writer.write(subDirectory);
                         addedEntries.add(fileName);
                         directoryCount += 1L;
@@ -213,18 +215,31 @@ public class FileMetadataScanner {
         }
     }
 
-    private static void addExtra(File file, DirectoryEntry entry) {
-        // Stat has no Windows support (loading it there prints an UnsupportedOperationException), and Windows has
-        // no POSIX permissions to record.
-        if (OS.get() == OS.WINDOWS) return;
+    private static void addExtra(File file, Path path, DirectoryEntry entry) {
+        if (OS.get() == OS.WINDOWS) {
+            // Stat has no Windows support (loading it there prints an UnsupportedOperationException), and Windows
+            // has no POSIX permissions to record. NTFS keeps 100 ns times, which NIO reads without following links.
+            try {
+                Instant modified = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
+                        .lastModifiedTime().toInstant();
+                addModifiedTime(entry, modified.getEpochSecond(), modified.getNano());
+            } catch (IOException | RuntimeException e) {
+                // Without it, a file keeps its millisecond time; a directory or symlink gets no time.
+            }
+            return;
+        }
         Stat stat = Stat.lstat(file);
         if (stat == null) return;
         entry.getExtra().add(new ExtraDataPosixPermissions(stat.mode & 07777, stat.uid, stat.gid));
-        if (!entry.isFile() || stat.mtimensec % 1000000L != 0L) {
+        addModifiedTime(entry, stat.mtime, stat.mtimensec);
+    }
+
+    private static void addModifiedTime(DirectoryEntry entry, long seconds, long nanos) {
+        if (!entry.isFile() || nanos % 1000000L != 0L) {
             // A file has a millisecond time of its own, so only add nanoseconds if its timestamp has an apparent level
             // of precision higher than milliseconds (1 million nanoseconds in 1 millisecond). Directories and
             // symlinks have no other modified time, so they always get it.
-            entry.getExtra().add(new ExtraDataNanosecondModifiedDate(stat.mtime, (int) stat.mtimensec));
+            entry.getExtra().add(new ExtraDataNanosecondModifiedDate(seconds, (int) nanos));
         }
     }
 
