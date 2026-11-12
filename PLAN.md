@@ -482,7 +482,14 @@ These are settled; don't revisit them inside a step.
   - `latest` is accepted as a backup name.
   - Uses the JSON endpoints from Phase 1. Tests against the harness.
 
-- [ ] **Add the `restore` command**
+- [x] **Add the `restore` command**
+  - Done: `248119e` (2026-11-12). New `client/.../RestoreCommand`: a directory's contents go into `<destination>`
+    (created or merged), a file goes to `<destination>` or into it if it's a directory, `/` restores the whole backup.
+    Conflicts are checked up front (nothing is written if any exist without `--overwrite`; non-empty folders are never
+    replaced); per-item failures are listed and exit 1. Content-ID files are downloaded via the file route (empty
+    content isn't), deduplicated by content and copied; metadata goes last (time, then owner as root via
+    `user.name == root`, then mode; directories deepest first; symlink time failures ignored). Windows restore is
+    untested until the Windows end-to-end step. Tests: `client` `RestoreCommandTest`.
   - `databackup restore <machine> <backup> <path-in-backup> <destination> [--overwrite]` downloads the manifest
     once, then restores the file or directory tree under it:
     - Content comes from the per-machine file download route (needs `read:<machine>`, not `globalread`).
