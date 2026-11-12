@@ -11,6 +11,7 @@ import io.siggi.databackup.data.content.ContentIDFileContent;
 import io.siggi.databackup.data.extra.ExtraDataFilePath;
 import io.siggi.databackup.data.extra.ExtraDataNanosecondModifiedDate;
 import io.siggi.databackup.data.extra.ExtraDataPosixPermissions;
+import io.siggi.databackup.osutils.OS;
 import io.siggi.databackup.util.stream.IO;
 import io.siggi.databackup.util.stream.MessageDigestOutputStream;
 import io.siggi.databackup.util.ObjectWriter;
@@ -42,6 +43,7 @@ public class FileMetadataScanner {
     public final List<String> ignoredItems = new LinkedList<>();
     public final List<String> failedItems = new LinkedList<>();
     private Predicate<String> pathChecker;
+    private File rootListingDirectory;
     private boolean hasGrabbed = false;
     private DirectoryEntryDirectory baseForDiff;
     private Function<String, DiffAction> diffFunction;
@@ -72,6 +74,18 @@ public class FileMetadataScanner {
         return this;
     }
 
+    /**
+     * Lists the top level from {@code directory} instead of {@link #rootFile}, while still reading every entry
+     * (metadata, contents and subdirectories) from {@link #rootFile}. Entries listed here but missing from
+     * {@link #rootFile} are left out. Windows needs this: the root of a shadow copy
+     * ({@code \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN}) can't be listed, but everything below it can, so
+     * the root is listed from the live drive.
+     */
+    public FileMetadataScanner setRootListingDirectory(File directory) {
+        this.rootListingDirectory = directory;
+        return this;
+    }
+
     public FileMetadataScanner createDiff(DirectoryEntryDirectory baseForDiff, Function<String, DiffAction> diffFunction) {
         this.baseForDiff = baseForDiff;
         this.diffFunction = diffFunction;
@@ -96,15 +110,19 @@ public class FileMetadataScanner {
         Map<String, DirectoryEntry> baseEntries = baseForDiff == null ? null : baseForDiff.getEntries();
         Set<String> addedEntries = new HashSet<>();
         Set<String> skippedEntries = new HashSet<>();
+        boolean isRoot = path.isEmpty();
+        File listingDirectory = isRoot && rootListingDirectory != null ? rootListingDirectory : directory;
         try (ObjectWriter<DirectoryEntry> writer = directoryEntry.updateEntries()) {
-            try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(PathHack.get().createPath(directory.getAbsolutePath()))) {
-                for (Path filePathO : PathHack.get().fix(directoryStream)) {
+            try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(PathHack.get().createPath(listingDirectory.getAbsolutePath()))) {
+                for (Path listedPath : PathHack.get().fix(directoryStream)) {
                     if (Thread.interrupted()) {
                         throw new InterruptedException();
                     }
-                    String fileName = filePathO.toString();
+                    String fileName = listedPath.toString();
                     fileName = fileName.substring(fileName.lastIndexOf(File.separator) + 1);
                     File file = new File(directory, fileName);
+                    Path filePathO = listingDirectory == directory ? listedPath
+                            : PathHack.get().createPath(file.getAbsolutePath());
                     String filePath = path + fileName;
                     DirectoryEntry baseEntry = baseEntries == null ? null : baseEntries.get(fileName);
                     File noBackup = new File(file, ".nobackup");
@@ -158,6 +176,10 @@ public class FileMetadataScanner {
                     }
                 }
             } catch (IOException | DirectoryIteratorException e) {
+                if (isRoot) {
+                    throw new IOException("Can't list " + listingDirectory, e instanceof DirectoryIteratorException d ? d.getCause() : e);
+                }
+                failedItems.add(path.substring(0, path.length() - 1));
                 return;
             }
             if (baseEntries != null && diffAction.level >= DiffAction.PARTIAL_SCAN.level) {
@@ -192,6 +214,9 @@ public class FileMetadataScanner {
     }
 
     private static void addExtra(File file, DirectoryEntry entry) {
+        // Stat has no Windows support (loading it there prints an UnsupportedOperationException), and Windows has
+        // no POSIX permissions to record.
+        if (OS.get() == OS.WINDOWS) return;
         Stat stat = Stat.lstat(file);
         if (stat == null) return;
         entry.getExtra().add(new ExtraDataPosixPermissions(stat.mode & 07777, stat.uid, stat.gid));

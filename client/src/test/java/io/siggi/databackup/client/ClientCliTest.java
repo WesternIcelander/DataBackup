@@ -222,6 +222,13 @@ class ClientCliTest {
                 Map<String, Snapshot> result = new HashMap<>();
                 for (String fs : filesystems) {
                     String path = destination.apply(fs);
+                    try {
+                        // Stands in for the snapshot's contents, so the manifest can be built from it.
+                        Files.createDirectories(Path.of(path));
+                        Files.writeString(Path.of(path, "hello.txt"), "hello");
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
                     existing.add(path);
                     log.add("create " + path);
                     result.put(fs, snapshot(path));
@@ -282,9 +289,11 @@ class ClientCliTest {
         FakeCliPlatform platform = new FakeCliPlatform();
         platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
         Result r = run(platform, "--config", file.toString(), "backup");
-        // Scanning and uploading come in the next steps.
+        // Uploading comes in a later step.
         assertEquals(ClientCli.FAILED, r.exitCode(), r.err());
-        assertTrue(r.err().contains("Scanning and uploading are not implemented yet"), r.err());
+        assertTrue(r.err().contains("Uploading is not implemented yet"), r.err());
+        assertTrue(r.out().contains("Manifest: 1 files"), r.out());
+        assertTrue(Files.isRegularFile(dir.resolve("state").resolve("pending-manifest")));
         assertEquals(2, platform.log.size(), platform.log.toString());
         assertTrue(platform.log.get(0).startsWith("create " + dir.resolve("state").resolve("snapshots")
                 .resolve("Data-")), platform.log.toString());

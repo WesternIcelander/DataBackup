@@ -250,4 +250,48 @@ class FileMetadataScannerTest {
             assertHashes(current.getRootDirectory());
         }
     }
+
+    @Test
+    void listsRootFromAnotherDirectory() throws Exception {
+        // Only entries listed in the live root are scanned: "only-live" is missing from the scanned root, so it is
+        // left out, and "empty", "link" and the excluded entries aren't listed at all.
+        Path live = tempDir.resolve("live");
+        Files.createDirectories(live.resolve("sub"));
+        Files.createDirectories(live.resolve("only-live"));
+        Files.writeString(live.resolve("a.txt"), "a different, longer live file");
+        FileMetadataScanner scanner = new FileMetadataScanner(source.toFile())
+            .setPathPredicate(FileMetadataScannerTest::include)
+            .setRootListingDirectory(live.toFile())
+            .grabFiles();
+        DirectoryEntryDirectory root = scanner.rootDirectory;
+        assertEquals(List.of("a.txt", "sub"), root.getEntries().keySet().stream().sorted().toList());
+        // metadata and subdirectories come from the scanned root, not the listing directory
+        assertEquals(5L, root.getEntry("a.txt").asFile().getSize());
+        assertEquals(List.of("b.txt", "deep", "dir-link"),
+            root.getEntry("sub").asDirectory().getEntries().keySet().stream().sorted().toList());
+        scanner.fillInHashes(null);
+        assertArrayEquals(sha256("hello".getBytes(StandardCharsets.UTF_8)),
+            ((ContentIDFileContent) root.getEntry("a.txt").asFile().getFileContents().get(0)).getHash());
+    }
+
+    @Test
+    void unlistableRootFails() {
+        FileMetadataScanner scanner = new FileMetadataScanner(tempDir.resolve("missing").toFile());
+        IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class, scanner::grabFiles);
+        assertTrue(e.getMessage().contains("missing"), e.getMessage());
+    }
+
+    @Test
+    void unlistableSubdirectoryIsReportedAsFailed() throws Exception {
+        Path locked = source.resolve("sub/locked");
+        Files.createDirectories(locked);
+        Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("---------"));
+        try {
+            org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(locked), "running as root");
+            FileMetadataScanner scanner = scan();
+            assertEquals(List.of("sub/locked"), scanner.failedItems);
+        } finally {
+            Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
+        }
+    }
 }

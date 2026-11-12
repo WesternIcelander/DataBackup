@@ -133,9 +133,11 @@ final class ClientCli {
         switch (command) {
             case "backup":
                 return SnapshotCommands.backup(clientConfig, platform, snapshots -> {
-                    // Scanning and uploading come in later plan steps.
-                    err.println("Scanning and uploading are not implemented yet; the snapshots were taken and will"
-                            + " now be deleted (config " + clientConfig.getConfigFile() + " is valid).");
+                    ManifestBuilder.Result manifest = new ManifestBuilder(clientConfig.getStateDir(), out)
+                            .buildFromSnapshots(snapshots);
+                    // Uploading comes in a later plan step.
+                    err.println("Uploading is not implemented yet; the manifest was written to "
+                            + manifest.manifest() + " and the snapshots will now be deleted.");
                     return FAILED;
                 }, out, err);
             case "snapshots":
