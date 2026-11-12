@@ -427,7 +427,13 @@ These are settled; don't revisit them inside a step.
   - When the user reports back, or the log file exists: read the log, add fix steps right after this one for any
     `FAIL`, and mark this step `- [x]` only when everything passes.
 
-- [ ] **Upload the backup and implement the `backup` command**
+- [x] **Upload the backup and implement the `backup` command**
+  - Done: `230dbdf` (2026-11-12). New `client/.../BackupCommand` (`run` for the CLI; test-only `backup(List<ScanSource>)`
+    and `uploadAndCommit(result, scanPaths)`); `ClientCli.run` gained an `apiFactory` overload so tests can use short
+    retries. Content is streamed at exactly its manifest length (zero-padded if the file shrank or can't be opened),
+    so a changed or vanished file shows up as the server's `notReceived` and fails the backup with a per-file list; the
+    pending manifest stays on the server (still never cleaned up). Also fixed `ServerApi` failing on empty content.
+    Tests: `client` `BackupCommandTest` (end-to-end, second run uploads only the changed file) and `ClientCliTest`.
   - `databackup backup`:
     1. Clean up stale snapshots.
     2. Create snapshots and build the manifest.
