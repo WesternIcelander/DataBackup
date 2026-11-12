@@ -58,7 +58,9 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 0: Groundwork
 
-- [ ] **Set up JUnit 5 for all modules**
+- [x] **Set up JUnit 5 for all modules**
+  - Done: `87ca486` (2026-11-12). Parent `pom.xml` now declares `junit-jupiter` 5.13.4 (test scope) for every module
+    and `maven-surefire-plugin` 3.5.3; `common` has `JUnitSetupTest`. Also set `project.build.sourceEncoding` to UTF-8.
   - Add the JUnit Jupiter dependency (test scope) and a current `maven-surefire-plugin` to the parent `pom.xml`, so
     every module can have tests under `src/test/java`. Use a version already in `~/.m2/repository/org/junit/` so
     `mvn -o test` works.
