@@ -292,7 +292,14 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 2: Backup client
 
-- [ ] **Set up the client config and CLI skeleton**
+- [x] **Set up the client config and CLI skeleton**
+  - Done: `ba61cdc` (2026-11-12). `ClientCli.run(args, ClientPaths, out, err)` parses with `Arguments` (`--config`
+    before or after the command, `--` ends options); each command validates its arity, loads the config and then
+    prints "not implemented yet" (exit 1) until its step replaces the stub. Exit 2 is a usage or config error.
+    `ClientConfig.load/parse` rejects unknown keys; relative `tokenFile`/`stateDir` resolve against the config's
+    folder; source names follow the server's name rule and are unique ignoring case; source paths are absolute and
+    unique. Default state on macOS/Windows is `<dir>/state` (Linux `/var/lib/databackup-client`). Each `Source` has a
+    `matcher()` (`ExcludeMatcher`: global plus its own globs, `/`-separated whole-path match, `**/` for any depth).
   - In `client`, `DataBackupClient.main` dispatches subcommands (`backup`, `list`, `restore`, `snapshots cleanup`,
     `help`) through a small hand-written argument parser; don't add a CLI library.
   - Config file `client.json`, read with Gson:
