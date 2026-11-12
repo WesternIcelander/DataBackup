@@ -529,7 +529,13 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 5: Retention and garbage collection
 
-- [ ] **Add a retention policy and pruning**
+- [x] **Add a retention policy and pruning**
+  - Done: `dab353b` (2026-11-12). New `server/.../retention/RetentionPolicy` (pure `apply(items, time, zone)`; rules
+    count independently, periods without backups don't count, ISO weeks) and `Pruner`; days/weeks/months use the
+    server's default time zone. `BackupRepository.delete(items)` deletes manifests and reloads. `cleanup()` prunes
+    (the cleanup thread also runs it once at startup), `DataBackupServer.prune(dryRun)` is public, and `server prune
+    [--dry-run]` works offline on the data folder; a running server doesn't notice CLI deletions until restart, and
+    no lock is shared with commit yet (the GC step adds one). Tests: `RetentionPolicyTest`, `PruneTest`.
   - Policy in `server.json`: a default plus optional per-machine overrides. Settings: keep the last N backups, plus
     keep-daily D, keep-weekly W and keep-monthly M (keep the newest backup in each period, working back from the
     latest).
