@@ -365,7 +365,17 @@ These are settled; don't revisit them inside a step.
     class copied over with the jars. Check that nothing is left behind (`btrfs subvolume list /`,
     `vssadmin list shadows`, keeping any shadow copies that existed before the run).
 
-- [ ] **Build the manifest from the scan**
+- [x] **Build the manifest from the scan**
+  - Done: `51bef91` (2026-11-12). `client/.../ManifestBuilder` (package `io.siggi.databackup.client`):
+    `buildFromSnapshots(snapshots)` for the CLI, and the package-private, test-only `build(List<ScanSource>)` that
+    scans plain folders (the next step's end-to-end test can call it from the same package). It returns a `Result`
+    (manifest path, snapshot UUID, files/bytes, hashed and reused counts, failed/ignored paths prefixed with the source
+    name); files that can't be read are left out of the manifest. `ExtraDataFilePath` is the configured path with `/`
+    separators (`C:/`, `/`). `FileMetadataScanner.setRootListingDirectory` lists an NTFS source's root from the live
+    drive; the scanner now throws if a source root can't be listed, reports unlistable subdirectories as failed, and
+    skips `Stat` on Windows. `backup` builds the manifest, then still exits 1 ("Uploading is not implemented yet").
+    Verified on `databackup-win10` against real shadow copies (`WindowsPathHack` works on Java 17; files changed after
+    the snapshot keep their snapshot content; hash reuse works).
   - For each source, run `FileMetadataScanner` on the snapshot's mounted path:
     - Apply the source and global excludes through `setPathPredicate`. `.nobackup` is already honored.
     - Set `ExtraDataFilePath` to the original live path, not the snapshot path.
