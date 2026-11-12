@@ -120,9 +120,9 @@ class ManifestUploadTest {
     }
 
     private void storeContent(byte[] data) throws Exception {
-        Path tmp = Files.createTempFile(harness.dataDir(), "content", ".bin");
-        Files.write(tmp, data);
-        assertTrue(harness.server().getDataRepository().getStoredData(sha256(data)).store(tmp.toFile(), null));
+        HttpResponse<String> response = harness.uploadContent(token, new ServerTestHarness.FilePart("data.bin", data));
+        assertEquals(200, response.statusCode(), response::body);
+        assertEquals(List.of(sha256(data)), strings(json(response).getAsJsonArray("stored")));
     }
 
     private static JsonObject json(HttpResponse<String> response) {

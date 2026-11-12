@@ -154,6 +154,35 @@ public final class ServerTestHarness implements AutoCloseable {
         return send(builder.build());
     }
 
+    /**
+     * One file part of a {@code multipart/form-data} upload. A null {@code filename} sends
+     * {@code filename=""}, which still marks the part as a file.
+     */
+    public record FilePart(String filename, byte[] data) {
+    }
+
+    /**
+     * Posts the given files to {@code POST /upload} as {@code multipart/form-data}, with an extra non-file field
+     * first, which the server must skip.
+     */
+    public HttpResponse<String> uploadContent(String token, FilePart... parts) throws IOException, InterruptedException {
+        String boundary = "----databackup-test-" + UUID.randomUUID();
+        java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+        body.writeBytes(("--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"note\"\r\n\r\n"
+                + "not a file\r\n").getBytes(StandardCharsets.UTF_8));
+        for (FilePart part : parts) {
+            String filename = part.filename() == null ? "" : part.filename();
+            body.writeBytes(("--" + boundary + "\r\n"
+                    + "Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n"
+                    + "Content-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            body.writeBytes(part.data());
+            body.writeBytes("\r\n".getBytes(StandardCharsets.UTF_8));
+        }
+        body.writeBytes(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+        return post("/upload", token, body.toByteArray(), "Content-Type", "multipart/form-data; boundary=" + boundary);
+    }
+
     @Override
     public void close() throws Exception {
         try {

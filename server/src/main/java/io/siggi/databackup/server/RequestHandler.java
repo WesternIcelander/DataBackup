@@ -99,7 +99,11 @@ public class RequestHandler implements HTTPResponder {
             if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("multipart/form-data")) {
                 throw new HttpError(400, "Expected multipart/form-data");
             }
-            server.contentReceiver.handle(request);
+            ContentReceiver.Result result = server.contentReceiver.handle(request);
+            JsonObject response = new JsonObject();
+            response.add("stored", toJsonArray(result.stored()));
+            response.add("alreadyPresent", toJsonArray(result.alreadyPresent()));
+            sendJson(request, response);
         } else if (url.startsWith("/content/")) {
             requireMethod(request, "GET");
             if (!auth.checkPermission("globalread")) throw forbidden("globalread");
