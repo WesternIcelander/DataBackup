@@ -1,5 +1,6 @@
 package io.siggi.databackup.server;
 
+import io.siggi.databackup.auth.Authorizer;
 import io.siggi.databackup.auth.simple.SimpleAuthorizer;
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.osutils.OS;
@@ -12,7 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class DataBackupServer {
+public class DataBackupServer implements AutoCloseable {
     final File root;
     final File backupsDir;
     final File tmpDir;
@@ -25,9 +26,29 @@ public class DataBackupServer {
     private Thread listenerThread;
     private Thread cleanupThread;
     private boolean started = false;
-    private boolean shutdown = false;
+    private volatile boolean shutdown = false;
 
+    /**
+     * Creates a server that reads its tokens from the {@code tokens} folder in {@code root}.
+     *
+     * @param root            the data folder
+     * @param listenerAddress the address to listen on, or {@code null} for port 8080 on all interfaces. Port 0 picks
+     *                        a free port; see {@link #getPort()}.
+     */
     public DataBackupServer(File root, InetSocketAddress listenerAddress) throws IOException {
+        this(root, listenerAddress, null);
+    }
+
+    /**
+     * Creates a server.
+     *
+     * @param root            the data folder
+     * @param listenerAddress the address to listen on, or {@code null} for port 8080 on all interfaces. Port 0 picks
+     *                        a free port; see {@link #getPort()}.
+     * @param authorizer      the authorizer to check tokens with, or {@code null} to use a {@link SimpleAuthorizer}
+     *                        on the {@code tokens} folder in {@code root}
+     */
+    public DataBackupServer(File root, InetSocketAddress listenerAddress, Authorizer authorizer) throws IOException {
         this.root = root;
         this.backupsDir = new File(root, "backups");
         this.tmpDir = new File(root, "tmp");
@@ -43,9 +64,17 @@ public class DataBackupServer {
         }
         this.listenerAddress = listenerAddress;
         this.httpServer = new HTTPServerBuilder().build();
+        if (authorizer == null) {
+            authorizer = new SimpleAuthorizer(new File(root, "tokens"));
+        }
         this.serverSocket = new ServerSocket();
-        serverSocket.bind(listenerAddress);
-        this.requestHandler = new RequestHandler(this, new SimpleAuthorizer(new File(root, "tokens")));
+        try {
+            serverSocket.bind(listenerAddress);
+        } catch (IOException e) {
+            serverSocket.close();
+            throw e;
+        }
+        this.requestHandler = new RequestHandler(this, authorizer);
         this.httpServer.responderRegistry.register("/", this.requestHandler);
         this.httpServer.setIgnoringMultipartFormData(true);
     }
@@ -73,22 +102,55 @@ public class DataBackupServer {
         new DataBackupServer(dataRoot, null).start();
     }
 
-    private void start() {
-        if (started) return;
+    /**
+     * Returns the port the server is bound to. This is the actual port when the server was created with port 0.
+     */
+    public int getPort() {
+        return serverSocket.getLocalPort();
+    }
+
+    /**
+     * Starts accepting connections. Does nothing if the server was already started or shut down.
+     */
+    public synchronized void start() {
+        if (started || shutdown) return;
         started = true;
         (listenerThread = new Thread(this::listenerThread, "ListenerThread")).start();
         (cleanupThread = new Thread(this::cleanupThread, "CleanupThread")).start();
     }
 
-    private void shutdown() {
-        if (!started || shutdown) return;
-        shutdown = true;
+    /**
+     * Stops accepting connections and waits for the listener and cleanup threads to stop. Requests already being
+     * handled may still finish afterwards. Calling this more than once, or before {@link #start()}, is allowed.
+     */
+    public void shutdown() throws InterruptedException {
+        Thread listener;
+        Thread cleanup;
+        synchronized (this) {
+            shutdown = true;
+            listener = listenerThread;
+            cleanup = cleanupThread;
+        }
         try {
             serverSocket.close();
         } catch (IOException ignored) {
         }
-        listenerThread.interrupt();
-        cleanupThread.interrupt();
+        if (listener != null) {
+            listener.interrupt();
+            listener.join();
+        }
+        if (cleanup != null) {
+            cleanup.interrupt();
+            cleanup.join();
+        }
+    }
+
+    /**
+     * Same as {@link #shutdown()}.
+     */
+    @Override
+    public void close() throws InterruptedException {
+        shutdown();
     }
 
     private void listenerThread() {
@@ -97,6 +159,7 @@ public class DataBackupServer {
                 Socket socket = serverSocket.accept();
                 httpServer.handle(socket);
             } catch (Exception e) {
+                if (shutdown) break;
                 e.printStackTrace();
             }
         }
