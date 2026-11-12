@@ -1,6 +1,8 @@
 package io.siggi.databackup.client;
 
 import com.google.gson.JsonObject;
+import io.siggi.databackup.client.api.RetryPolicy;
+import io.siggi.databackup.client.api.ServerApi;
 import io.siggi.databackup.client.snapshot.SnapshotPlatform;
 import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.MountedDisk;
@@ -8,6 +10,7 @@ import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 import io.siggi.databackup.diskutil.SnapshotSerializer;
 import io.siggi.databackup.osutils.OS;
+import io.siggi.databackup.server.ServerTestHarness;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,6 +20,8 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -49,15 +54,23 @@ class ClientCliTest {
     private Result run(SnapshotPlatform platform, String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = ClientCli.run(args, defaults(), platform, new PrintStream(out, true, StandardCharsets.UTF_8),
-                new PrintStream(err, true, StandardCharsets.UTF_8));
+        int code = ClientCli.run(args, defaults(), platform,
+                config -> ServerApi.builder(config.getServerUrl(), config.getToken())
+                        .retryPolicy(new RetryPolicy(2, Duration.ofMillis(10), Duration.ofMillis(20), 2.0))
+                        .build(),
+                new PrintStream(out, true, StandardCharsets.UTF_8), new PrintStream(err, true, StandardCharsets.UTF_8));
         return new Result(code, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
     }
 
     private Path writeConfig(String name) throws Exception {
+        return writeConfig(name, "http://localhost:1", "t");
+    }
+
+    private Path writeConfig(String name, String serverUrl, String token) throws Exception {
         Path file = dir.resolve(name);
         String source = dir.resolve("src").toAbsolutePath().toString().replace("\\", "\\\\");
-        Files.writeString(file, "{\"serverUrl\": \"http://localhost:1\", \"token\": \"t\", \"machineName\": \"m\", "
+        Files.writeString(file, "{\"serverUrl\": \"" + serverUrl + "\", \"token\": \"" + token
+                + "\", \"machineName\": \"m\", "
                 + "\"sources\": [{\"name\": \"Data\", \"path\": \"" + source + "\"}]}", StandardCharsets.UTF_8);
         return file;
     }
@@ -284,24 +297,46 @@ class ClientCliTest {
     }
 
     @Test
-    void backupTakesAndDeletesSnapshots() throws Exception {
+    void backupTakesSnapshotsUploadsAndDeletesThem() throws Exception {
+        try (ServerTestHarness harness = ServerTestHarness.start()) {
+            String token = harness.createToken("upload:m", "read:m");
+            Path file = writeConfig("custom.json", harness.uri("/").toString(), token);
+            FakeCliPlatform platform = new FakeCliPlatform();
+            platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
+            Result r = run(platform, "--config", file.toString(), "backup");
+            assertEquals(ClientCli.OK, r.exitCode(), r.err());
+            assertTrue(r.out().contains("Manifest: 1 files"), r.out());
+            assertTrue(r.out().matches("(?s).*\\nBackup \\d{4}-\\d\\d-\\d\\d-\\d\\d-\\d\\d-\\d\\d complete: 1 files "
+                    + "\\(5 B\\), 5 B uploaded, took \\d+\\.\\ds\\.\\R"), r.out());
+            assertFalse(Files.exists(dir.resolve("state").resolve("pending-manifest")));
+            assertTrue(Files.isRegularFile(dir.resolve("state").resolve("last-manifest")));
+            assertEquals(2, platform.log.size(), platform.log.toString());
+            assertTrue(platform.log.get(0).startsWith("create " + dir.resolve("state").resolve("snapshots")
+                    .resolve("Data-")), platform.log.toString());
+            assertEquals(platform.log.get(0).replace("create", "delete"), platform.log.get(1));
+            assertTrue(platform.existing.isEmpty());
+            assertTrue(r.out().contains("Snapshot of Data"), r.out());
+            assertTrue(r.out().contains("Deleted snapshot of Data"), r.out());
+            // The snapshot is deleted only after the commit.
+            assertTrue(r.out().indexOf("Committing...") < r.out().indexOf("Deleted snapshot of Data"), r.out());
+            assertFalse(Files.exists(dir.resolve("state").resolve("snapshots.json")));
+            HttpResponse<String> listing = harness.get("/backups/m/?json", token);
+            assertEquals(200, listing.statusCode());
+            assertTrue(listing.body().contains("\"name\""), listing.body());
+        }
+    }
+
+    @Test
+    void backupFailsCleanlyWhenTheServerIsUnreachable() throws Exception {
         Path file = writeConfig("custom.json");
         FakeCliPlatform platform = new FakeCliPlatform();
         platform.subvolume = dir.resolve("src").toAbsolutePath().toString();
         Result r = run(platform, "--config", file.toString(), "backup");
-        // Uploading comes in a later step.
-        assertEquals(ClientCli.FAILED, r.exitCode(), r.err());
-        assertTrue(r.err().contains("Uploading is not implemented yet"), r.err());
-        assertTrue(r.out().contains("Manifest: 1 files"), r.out());
+        assertEquals(ClientCli.FAILED, r.exitCode());
+        assertTrue(r.err().startsWith("Backup failed: "), r.err());
         assertTrue(Files.isRegularFile(dir.resolve("state").resolve("pending-manifest")));
-        assertEquals(2, platform.log.size(), platform.log.toString());
-        assertTrue(platform.log.get(0).startsWith("create " + dir.resolve("state").resolve("snapshots")
-                .resolve("Data-")), platform.log.toString());
-        assertEquals(platform.log.get(0).replace("create", "delete"), platform.log.get(1));
+        assertFalse(Files.exists(dir.resolve("state").resolve("last-manifest")));
         assertTrue(platform.existing.isEmpty());
-        assertTrue(r.out().contains("Snapshot of Data"), r.out());
-        assertTrue(r.out().contains("Deleted snapshot of Data"), r.out());
-        assertFalse(Files.exists(dir.resolve("state").resolve("snapshots.json")));
     }
 
     @Test

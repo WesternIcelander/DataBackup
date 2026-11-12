@@ -256,6 +256,8 @@ public final class ServerApi {
                 throw new UncheckedIOException(e);
             }
         }
+        // fromPublisher refuses a length of 0, so empty content is sent as an empty byte array.
+        if (source.size() == 0) return HttpRequest.BodyPublishers.ofByteArray(new byte[0]);
         return HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> {
             try {
                 return source.open();

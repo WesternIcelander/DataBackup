@@ -2,6 +2,7 @@ package io.siggi.databackup.client;
 
 import io.siggi.databackup.client.Arguments.UsageException;
 import io.siggi.databackup.client.ClientConfig.ConfigException;
+import io.siggi.databackup.client.api.ServerApi;
 import io.siggi.databackup.client.snapshot.SnapshotPlatform;
 
 import java.io.PrintStream;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * The client's command line: {@code backup}, {@code list}, {@code restore}, {@code snapshots cleanup} and
@@ -58,6 +60,14 @@ final class ClientCli {
 
     static int run(String[] args, ClientPaths defaults, SnapshotPlatform platform, PrintStream out,
                    PrintStream err) {
+        return run(args, defaults, platform, ServerApi::forConfig, out, err);
+    }
+
+    /**
+     * @param apiFactory makes the server client from the loaded config (tests pass one with short retries)
+     */
+    static int run(String[] args, ClientPaths defaults, SnapshotPlatform platform,
+                   Function<ClientConfig, ServerApi> apiFactory, PrintStream out, PrintStream err) {
         String config = null;
         int i = 0;
         // Options before the command.
@@ -132,14 +142,7 @@ final class ClientCli {
 
         switch (command) {
             case "backup":
-                return SnapshotCommands.backup(clientConfig, platform, snapshots -> {
-                    ManifestBuilder.Result manifest = new ManifestBuilder(clientConfig.getStateDir(), out)
-                            .buildFromSnapshots(snapshots);
-                    // Uploading comes in a later plan step.
-                    err.println("Uploading is not implemented yet; the manifest was written to "
-                            + manifest.manifest() + " and the snapshots will now be deleted.");
-                    return FAILED;
-                }, out, err);
+                return BackupCommand.run(clientConfig, platform, apiFactory, out, err);
             case "snapshots":
                 return SnapshotCommands.cleanup(clientConfig, platform, out, err);
             default:
