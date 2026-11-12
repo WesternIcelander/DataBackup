@@ -138,7 +138,11 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 1: Server
 
-- [ ] **Make `DataBackupServer` testable, and add a server test harness**
+- [x] **Make `DataBackupServer` testable, and add a server test harness**
+  - Done: `da20e3e` (2026-11-12). New 3-arg constructor takes an `Authorizer` (null means `SimpleAuthorizer` on
+    `tokens/`); `getPort()`, public `start()`/`shutdown()` (joins both threads, repeatable) and `AutoCloseable`. Test
+    harness is `server/src/test/.../ServerTestHarness` (`start()`, `createToken(perms...)`, `get`/`put`/`post`/`send`).
+    The no-token smoke test only asserts a status >= 400 for now; tighten it to 401 in the error-responses step.
   - `DataBackupServer`:
     - Allow port 0 and expose the bound port.
     - Make `start()` and `shutdown()` public; `shutdown()` should wait for the listener thread to stop.
