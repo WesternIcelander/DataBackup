@@ -567,7 +567,14 @@ These are settled; don't revisit them inside a step.
 
 ## Phase 6: Real-platform checks
 
-- [ ] **(manual) Prepare the macOS end-to-end check for the user**
+- [~] **(manual) Prepare the macOS end-to-end check for the user**
+  - Awaiting verification: `5df4f45` (2026-11-12). User must follow docs/manual-checks/macos.md and report results.
+    The one command (after `mvn -o -q package`): `sudo docs/manual-checks/macos-e2e.sh`; results go to
+    `target/manual-checks/macos-e2e.log`. Sources must be whole volumes, so the config backs up `/` (the Data volume)
+    with every other top-level Data-volume entry excluded; the test folder is `/System/Volumes/Data/DataBackup-e2e-test`.
+    The `kill -9` run points at a closed port so it holds its snapshot while retrying. Nanosecond and symlink times
+    are `INFO` only. Checked so far: `bash -n`, the non-root and missing-jar refusals, and the non-root helpers
+    (config generation accepted by the client, tree comparison, server start and token). Nothing later depends on it.
   - **Don't wait for the user and don't block the run.** Prepare everything, mark the step `- [~]`, and return ok so
     the workflow continues. No later step may depend on this one's result.
   - Build the jars, then write `docs/manual-checks/macos-e2e.sh`, a single script the user runs with `sudo` that:
