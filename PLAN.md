@@ -248,7 +248,12 @@ These are settled; don't revisit them inside a step.
     of entries with name, type, size, modified time, symlink target and permissions, for the CLI and web UI to use.
   - Add tests for each route.
 
-- [ ] **Compress stored content when it helps**
+- [x] **Compress stored content when it helps**
+  - Done: `36e0560` (2026-11-12). New `StoredData.storeCompressing(file, filename)` follows the repository's
+    `CompressionPolicy` (`DataRepository.get/setCompressionPolicy`; default gzip kept at >= 5% savings, skipping a
+    list of compressed extensions; `withMinSavings`, `never()`); otherwise it stores plain and marks do-not-compress.
+    `ContentReceiver` uses it. `store()` now refreshes its cached file. The server-config step should expose the
+    minimum saving in `server.json`. Tests: `common` `StoredDataCompressionTest`, `server` `ContentCompressionTest`.
   - When content is stored (in `ContentReceiver` and `DataRepository`/`StoredData.store`), try gzip and keep the
     compressed copy only if it saves at least 5% (make this configurable). Otherwise mark it `setDoNotCompress()`.
   - Skip the attempt for obviously already-compressed types, by known filename extension (jpg, png, mp4, zip, gz,
@@ -258,7 +263,8 @@ These are settled; don't revisit them inside a step.
 
 - [ ] **Add server configuration and token management**
   - Server config file `server.json` in the data folder, read with Gson: bind address, port, retention defaults
-    (used in Phase 5), garbage-collection grace period. Missing file means today's defaults. The
+    (used in Phase 5), garbage-collection grace period, and the minimum compression saving (default `0.05`, applied
+    through `DataRepository.setCompressionPolicy`). Missing file means today's defaults. The
     `-Ddatabackupdir` property still selects the data folder.
   - Add CLI subcommands to the server's `main`:
     - `serve` (the default).
