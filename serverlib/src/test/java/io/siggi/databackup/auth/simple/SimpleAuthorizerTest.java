@@ -151,6 +151,21 @@ class SimpleAuthorizerTest {
     }
 
     @Test
+    void anyPermissionChecks() throws Exception {
+        writeToken("t", "id=user1", "permission=upload:laptop", "permission=globalread");
+        SimpleAuthorization auth = authorizer().getAuthorization("t");
+        assertNotNull(auth);
+        assertTrue(auth.checkAnyPermission("upload"));
+        assertFalse(auth.checkAnyPermission("read"));
+        assertFalse(auth.checkAnyPermission("global"));
+        assertFalse(auth.checkAnyPermission("globalread"));
+        assertFalse(auth.checkAnyPermission(null));
+
+        writeToken("w", "id=user2", "permission=upload:*");
+        assertTrue(authorizer().getAuthorization("w").checkAnyPermission("upload"));
+    }
+
+    @Test
     void unreadableTokenFileIsRejected() throws Exception {
         // A directory where the token file should be cannot be read as a file.
         Files.createDirectory(tokenDir.resolve(sha256Hex("t") + ".txt"));

@@ -35,4 +35,14 @@ public class SimpleAuthorization implements Authorization {
         if (colonPos == -1) return false;
         return permissions.contains(permission.substring(0, colonPos + 1) + "*");
     }
+
+    @Override
+    public boolean checkAnyPermission(String prefix) {
+        if (prefix == null) return false;
+        String start = prefix + ":";
+        for (String permission : permissions) {
+            if (permission.startsWith(start) && permission.length() > start.length()) return true;
+        }
+        return false;
+    }
 }

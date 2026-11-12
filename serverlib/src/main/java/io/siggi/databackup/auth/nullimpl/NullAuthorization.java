@@ -17,4 +17,9 @@ public class NullAuthorization implements Authorization {
     public boolean checkPermission(String permission) {
         return true;
     }
+
+    @Override
+    public boolean checkAnyPermission(String prefix) {
+        return true;
+    }
 }

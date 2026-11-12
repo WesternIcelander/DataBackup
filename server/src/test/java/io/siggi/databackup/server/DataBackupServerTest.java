@@ -11,9 +11,9 @@ import java.net.Socket;
 import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DataBackupServerTest {
 
@@ -37,14 +37,13 @@ class DataBackupServerTest {
     @Test
     void requestWithoutTokenIsRejected() throws Exception {
         HttpResponse<String> response = harness.get("/backups/", null);
-        // Not yet a specific status: the next plan step makes this a 401.
-        assertTrue(response.statusCode() >= 400, "expected an error status, got " + response.statusCode());
+        assertEquals(401, response.statusCode());
     }
 
     @Test
     void requestWithUnknownTokenIsRejected() throws Exception {
         HttpResponse<String> response = harness.get("/backups/", "not-a-real-token");
-        assertTrue(response.statusCode() >= 400, "expected an error status, got " + response.statusCode());
+        assertEquals(401, response.statusCode());
     }
 
     @Test
