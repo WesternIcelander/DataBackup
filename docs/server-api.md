@@ -25,6 +25,9 @@ A typical backup run is:
 2. `POST /upload` with the missing content, in as many requests as convenient.
 3. `POST /backups/:machine/.pending/:pendingId/commit`. The backup is listed from then on.
 
+Finish a run within the garbage-collection grace period (`gcGracePeriodHours` in `server.json`, 48 hours by
+default): see [Garbage collection](#garbage-collection).
+
 ## Transport security
 
 The server speaks plain HTTP and the client does no encryption of its own; the server is trusted. Tokens and backup
@@ -213,8 +216,8 @@ Uploads a manifest and holds it as a pending backup. It isn't listed until it is
 
 `missing` lists each content ID the manifest references that the server doesn't have, once each, in the order first
 found. Upload those with `POST /upload`, then commit. Each upload gets a new `pendingId`, so a client can simply
-upload again after a failure; pending manifests that are never committed are left in
-`backups/<machine>/.pending/` (nothing removes them yet).
+upload again after a failure; pending manifests that are never committed are deleted by garbage collection once
+they are older than the grace period.
 
 **Errors:**
 
@@ -368,6 +371,20 @@ A read-only, server-rendered HTML interface for browsing backups and downloading
   base-uri 'none'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store`. Every name is HTML-escaped
   and every link piece percent-encoded. Downloaded backup content keeps the API's rule of never being sent as HTML.
+
+## Garbage collection
+
+There is no HTTP route for this. The server runs it every hour (and once at startup), right after pruning backups
+by the retention policies; `server gc [--dry-run]` runs it from the command line, but only while the server isn't
+running on that data folder. With `G` the grace period (`gcGracePeriodHours`, 48 hours by default):
+
+- Pending manifests older than `G`, and files in `tmp/` older than `G`, are deleted.
+- Every content ID referenced by a committed backup or a remaining pending manifest, of any machine, is kept.
+- Other stored content is deleted once its last touch is older than `G`. Uploading content (new or already present)
+  and committing a backup that references it both touch it.
+- If a committed manifest can't be read, no content is deleted.
+- Manifest uploads (from the moment the manifest becomes pending until the missing list is computed) and commits
+  wait while garbage collection runs, so content reported as present, or committed, isn't deleted underneath them.
 
 ## Unknown routes and methods
 

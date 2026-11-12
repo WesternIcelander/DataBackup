@@ -32,6 +32,7 @@ import com.google.gson.JsonObject;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.locks.Lock;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipException;
@@ -294,15 +295,23 @@ public class RequestHandler implements HTTPResponder {
                 throw new HttpError(409, "This machine already has a backup with snapshot ID " + snapshotUuid);
             }
             String pendingId = UUID.randomUUID().toString();
-            File pendingDirectory = repository.getPendingDirectory();
-            pendingDirectory.mkdirs();
-            File pendingFile = new File(pendingDirectory, pendingId);
-            if (!temporaryCanonicalFile.renameTo(pendingFile)) {
-                throw new IOException("Could not move manifest to " + pendingFile);
-            }
             List<String> missing;
-            try (BackupFile file = BackupFile.open(pendingFile)) {
-                missing = findMissingContent(file.getRootDirectory(), null);
+            // Garbage collection can't run between the manifest becoming pending (which protects the content it
+            // references) and the check for missing content, so content reported as present stays present.
+            Lock lock = server.getMaintenanceLock().readLock();
+            lock.lock();
+            try {
+                File pendingDirectory = repository.getPendingDirectory();
+                pendingDirectory.mkdirs();
+                File pendingFile = new File(pendingDirectory, pendingId);
+                if (!temporaryCanonicalFile.renameTo(pendingFile)) {
+                    throw new IOException("Could not move manifest to " + pendingFile);
+                }
+                try (BackupFile file = BackupFile.open(pendingFile)) {
+                    missing = findMissingContent(file.getRootDirectory(), null);
+                }
+            } finally {
+                lock.unlock();
             }
             JsonObject response = new JsonObject();
             response.addProperty("pendingId", pendingId);
@@ -319,6 +328,18 @@ public class RequestHandler implements HTTPResponder {
      * all of its content is on the server.
      */
     private void commitManifest(HTTPRequest request, BackupRepository repository, String pendingId) throws Exception {
+        // Garbage collection can't run during a commit.
+        Lock lock = server.getMaintenanceLock().readLock();
+        lock.lock();
+        try {
+            commitManifestLocked(request, repository, pendingId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void commitManifestLocked(HTTPRequest request, BackupRepository repository, String pendingId)
+            throws Exception {
         // One commit per machine at a time, so the duplicate and name checks below can't race.
         synchronized (repository) {
             File pendingFile = new File(repository.getPendingDirectory(), pendingId);

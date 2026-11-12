@@ -3,6 +3,8 @@ package io.siggi.databackup.server;
 import io.siggi.databackup.auth.simple.SimpleTokenStore;
 import io.siggi.databackup.auth.simple.SimpleTokenStore.CreatedToken;
 import io.siggi.databackup.auth.simple.SimpleTokenStore.TokenInfo;
+import io.siggi.databackup.datarepository.DataRepository;
+import io.siggi.databackup.server.gc.GarbageCollector;
 import io.siggi.databackup.server.repository.BackupRepositories;
 import io.siggi.databackup.server.retention.Pruner;
 import io.siggi.databackup.server.retention.RetentionPolicy;
@@ -10,12 +12,14 @@ import io.siggi.databackup.server.retention.RetentionPolicy;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The server's command line: {@code serve} (the default), {@code token create|list|revoke}, {@code prune} and
- * {@code help}. The data folder is chosen by {@link DataBackupServer#defaultDataRoot()} ({@code -Ddatabackupdir=...}).
+ * The server's command line: {@code serve} (the default), {@code token create|list|revoke}, {@code prune},
+ * {@code gc} and {@code help}. The data folder is chosen by {@link DataBackupServer#defaultDataRoot()} ({@code -Ddatabackupdir=...}).
  */
 final class ServerCli {
 
@@ -36,6 +40,11 @@ final class ServerCli {
                                                       don't keep. --dry-run only lists them. A running server
                                                       also prunes every hour, and doesn't see backups deleted
                                                       here until it restarts.
+              gc [--dry-run]                          Delete stored content that no backup or pending upload
+                                                      references, pending uploads and temp files, once older
+                                                      than gcGracePeriodHours. --dry-run only counts them. Can't
+                                                      run while the server is running; the server does this
+                                                      every hour after pruning.
               help                                    Show this help.
 
             Permissions: upload:<machine>, read:<machine>, upload:*, read:*, globalread, admin.
@@ -61,6 +70,8 @@ final class ServerCli {
                     return token(args, dataRoot, out, err);
                 case "prune":
                     return prune(args, dataRoot, out, err);
+                case "gc":
+                    return gc(args, dataRoot, out, err);
                 case "help":
                 case "--help":
                 case "-h":
@@ -100,7 +111,13 @@ final class ServerCli {
             } catch (InterruptedException ignored) {
             }
         }, "ShutdownHook"));
-        server.start();
+        try {
+            server.start();
+        } catch (IllegalStateException e) {
+            server.shutdown();
+            err.println("Error: " + e.getMessage());
+            return FAILED;
+        }
         err.println("DataBackup server listening on port " + server.getPort() + ", data folder "
                 + dataRoot.getAbsolutePath());
         server.awaitTermination();
@@ -143,6 +160,37 @@ final class ServerCli {
             }
         }
         return failed ? FAILED : OK;
+    }
+
+    private static int gc(String[] args, File dataRoot, PrintStream out, PrintStream err) throws IOException {
+        boolean dryRun = false;
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].equals("--dry-run")) {
+                dryRun = true;
+            } else {
+                return usage(err, "Unexpected argument: " + args[i]);
+            }
+        }
+        if (!dataRoot.isDirectory()) {
+            err.println("Data folder does not exist: " + dataRoot.getPath());
+            return FAILED;
+        }
+        ServerConfig config = ServerConfig.load(dataRoot);
+        try (FileChannel channel = DataBackupServer.openDataLockChannel(dataRoot)) {
+            FileLock lock = DataBackupServer.tryLock(channel);
+            if (lock == null) {
+                err.println("The server is running on this data folder (or another gc is). It collects garbage"
+                        + " every hour; stop it first to run gc now.");
+                return FAILED;
+            }
+            DataRepository dataRepository = new DataRepository(new File(dataRoot, "repository"));
+            GarbageCollector.Result result = DataBackupServer.createGarbageCollector(dataRoot, dataRepository, config)
+                    .run(dryRun, System.currentTimeMillis());
+            out.println("Garbage collection " + result.summary(dryRun) + " (grace period "
+                    + config.getGcGracePeriodHours() + " hours)");
+            for (String failed : result.failed()) err.println("  could not delete " + failed);
+            return result.failed().isEmpty() ? OK : FAILED;
+        }
     }
 
     private static int token(String[] args, File dataRoot, PrintStream out, PrintStream err) throws IOException {

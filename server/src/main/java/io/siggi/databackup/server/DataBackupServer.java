@@ -4,6 +4,7 @@ import io.siggi.databackup.auth.Authorizer;
 import io.siggi.databackup.auth.simple.SimpleAuthorizer;
 import io.siggi.databackup.datarepository.DataRepository;
 import io.siggi.databackup.osutils.OS;
+import io.siggi.databackup.server.gc.GarbageCollector;
 import io.siggi.databackup.server.repository.BackupRepositories;
 import io.siggi.databackup.server.retention.Pruner;
 import io.siggi.http.HTTPServer;
@@ -14,8 +15,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.StandardOpenOption;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class DataBackupServer implements AutoCloseable {
     final File root;
@@ -30,6 +36,9 @@ public class DataBackupServer implements AutoCloseable {
     private final RequestHandler requestHandler;
     private Thread listenerThread;
     private Thread cleanupThread;
+    private final ReentrantReadWriteLock maintenanceLock = new ReentrantReadWriteLock();
+    private FileChannel dataLockChannel;
+    private FileLock dataLock;
     private boolean started = false;
     private volatile boolean shutdown = false;
 
@@ -137,6 +146,20 @@ public class DataBackupServer implements AutoCloseable {
      */
     public synchronized void start() {
         if (started || shutdown) return;
+        try {
+            dataLockChannel = openDataLockChannel(root);
+            dataLock = tryLock(dataLockChannel);
+        } catch (IOException e) {
+            closeQuietly(dataLockChannel);
+            dataLockChannel = null;
+            throw new IllegalStateException("Could not lock " + new File(root, DATA_LOCK_FILE) + ": " + e, e);
+        }
+        if (dataLock == null) {
+            closeQuietly(dataLockChannel);
+            dataLockChannel = null;
+            throw new IllegalStateException("The data folder " + root + " is in use by another server or by"
+                    + " \"server gc\"");
+        }
         started = true;
         (listenerThread = new Thread(this::listenerThread, "ListenerThread")).start();
         (cleanupThread = new Thread(this::cleanupThread, "CleanupThread")).start();
@@ -165,6 +188,41 @@ public class DataBackupServer implements AutoCloseable {
         if (cleanup != null) {
             cleanup.interrupt();
             cleanup.join();
+        }
+        synchronized (this) {
+            closeQuietly(dataLockChannel);
+            dataLockChannel = null;
+            dataLock = null;
+        }
+    }
+
+    /**
+     * The file in the data folder a running server holds a lock on, so that {@code server gc} can't run alongside
+     * it (garbage collection must not overlap a manifest upload or commit).
+     */
+    static final String DATA_LOCK_FILE = "server.lock";
+
+    static FileChannel openDataLockChannel(File root) throws IOException {
+        return FileChannel.open(new File(root, DATA_LOCK_FILE).toPath(), StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE);
+    }
+
+    /**
+     * Tries to take an exclusive lock on the channel, returning null if another process or channel holds it.
+     */
+    static FileLock tryLock(FileChannel channel) throws IOException {
+        try {
+            return channel.tryLock();
+        } catch (OverlappingFileLockException e) {
+            return null;
+        }
+    }
+
+    private static void closeQuietly(FileChannel channel) {
+        if (channel == null) return;
+        try {
+            channel.close();
+        } catch (IOException ignored) {
         }
     }
 
@@ -211,7 +269,7 @@ public class DataBackupServer implements AutoCloseable {
     }
 
     /**
-     * The hourly maintenance run: prunes every machine's backups by its retention policy.
+     * The hourly maintenance run: prunes every machine's backups by its retention policy, then collects garbage.
      */
     void cleanup() {
         try {
@@ -220,6 +278,43 @@ public class DataBackupServer implements AutoCloseable {
             System.err.println("Pruning failed:");
             e.printStackTrace();
         }
+        try {
+            GarbageCollector.Result result = gc(false);
+            if (result.itemsDeleted() > 0 || !result.failed().isEmpty()) {
+                System.err.println("Garbage collection " + result.summary(false));
+                for (String failed : result.failed()) System.err.println("  could not delete " + failed);
+            }
+        } catch (IOException | RuntimeException e) {
+            System.err.println("Garbage collection failed: " + e.getMessage());
+            if (e instanceof RuntimeException) e.printStackTrace();
+        }
+    }
+
+    /**
+     * Collects garbage (see {@link GarbageCollector}): unreferenced content, pending manifests and temp files older
+     * than the grace period from the config. Manifest uploads and commits wait while this runs.
+     *
+     * @param dryRun if true, only work out what would be deleted
+     */
+    public GarbageCollector.Result gc(boolean dryRun) throws IOException {
+        maintenanceLock.writeLock().lock();
+        try {
+            return createGarbageCollector(root, dataRepository, config).run(dryRun, System.currentTimeMillis());
+        } finally {
+            maintenanceLock.writeLock().unlock();
+        }
+    }
+
+    static GarbageCollector createGarbageCollector(File root, DataRepository dataRepository, ServerConfig config) {
+        return new GarbageCollector(new File(root, "backups"), new File(root, "tmp"), dataRepository,
+                config.getGcGracePeriodMillis(), ContentReceiver::lockFor);
+    }
+
+    /**
+     * The lock that keeps garbage collection (write lock) apart from manifest uploads and commits (read lock).
+     */
+    ReentrantReadWriteLock getMaintenanceLock() {
+        return maintenanceLock;
     }
 
     /**

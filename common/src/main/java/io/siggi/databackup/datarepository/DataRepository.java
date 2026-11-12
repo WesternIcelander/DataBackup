@@ -26,6 +26,13 @@ public class DataRepository {
         this.compressionPolicy = compressionPolicy;
     }
 
+    /**
+     * Returns the folder the content is stored in. It may not exist yet.
+     */
+    public File getRoot() {
+        return root;
+    }
+
     public StoredDataStream openStream() throws IOException {
         return new StoredDataStream(this, root);
     }

@@ -96,7 +96,11 @@ public class ContentReceiver {
         for (int i = 0; i < LOCKS.length; i++) LOCKS[i] = new Object();
     }
 
-    private static Object lockFor(String contentId) {
+    /**
+     * The lock held while checking for, storing and touching a content ID. Garbage collection holds it too while it
+     * deletes that content, so content reported as already present can't be deleted in between.
+     */
+    static Object lockFor(String contentId) {
         return LOCKS[Math.floorMod(contentId.hashCode(), LOCKS.length)];
     }
 
