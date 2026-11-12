@@ -6,7 +6,6 @@ import io.siggi.databackup.client.api.ServerApiException;
 import io.siggi.databackup.client.snapshot.IoMessages;
 import io.siggi.databackup.data.BackupFile;
 import io.siggi.databackup.data.DirectoryEntry;
-import io.siggi.databackup.data.DirectoryEntryDirectory;
 import io.siggi.databackup.data.DirectoryEntryFile;
 import io.siggi.databackup.data.content.ContentIDFileContent;
 import io.siggi.databackup.data.content.FileContent;

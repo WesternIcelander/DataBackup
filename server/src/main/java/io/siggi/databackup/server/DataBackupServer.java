@@ -87,9 +87,6 @@ public class DataBackupServer implements AutoCloseable {
         this.backupRepositories = new BackupRepositories(new File(root, "backups"));
         this.tmpDir = new File(root, "tmp");
         if (!tmpDir.exists()) tmpDir.mkdirs();
-        for (File file : tmpDir.listFiles()) {
-            file.delete();
-        }
         File dataRepositoryRoot = new File(root, "repository");
         this.dataRepository = new DataRepository(dataRepositoryRoot);
         this.dataRepository.setCompressionPolicy(config.getCompressionPolicy());
@@ -160,9 +157,24 @@ public class DataBackupServer implements AutoCloseable {
             throw new IllegalStateException("The data folder " + root + " is in use by another server or by"
                     + " \"server gc\"");
         }
+        // Only now that this server holds the data folder: another server may be using these files.
+        clearTmpDir();
         started = true;
         (listenerThread = new Thread(this::listenerThread, "ListenerThread")).start();
         (cleanupThread = new Thread(this::cleanupThread, "CleanupThread")).start();
+    }
+
+    /**
+     * Deletes leftovers from an earlier run in {@code tmp/}. Called only while holding the data folder lock, so it
+     * can't delete the in-progress uploads of another server on the same folder.
+     */
+    private void clearTmpDir() {
+        if (!tmpDir.exists()) tmpDir.mkdirs();
+        File[] files = tmpDir.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            file.delete();
+        }
     }
 
     /**

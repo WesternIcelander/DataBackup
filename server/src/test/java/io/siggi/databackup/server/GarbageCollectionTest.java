@@ -263,6 +263,29 @@ class GarbageCollectionTest {
     }
 
     @Test
+    void aSecondServerLeavesTheRunningServersTempFilesAlone() throws Exception {
+        try (DataBackupServer first = new DataBackupServer(dataDir.toFile(),
+                new InetSocketAddress(InetAddress.getLoopbackAddress(), 0))) {
+            first.start();
+            Path upload = dataDir.resolve("tmp").resolve("in-progress-upload");
+            Files.write(upload, bytes("half an upload"));
+            try (DataBackupServer second = new DataBackupServer(dataDir.toFile(),
+                    new InetSocketAddress(InetAddress.getLoopbackAddress(), 0))) {
+                assertThrows(IllegalStateException.class, second::start);
+            }
+            assertTrue(Files.exists(upload), "the first server's temp file was deleted");
+        }
+        // A server that does start clears leftovers.
+        Path leftover = dataDir.resolve("tmp").resolve("leftover");
+        Files.write(leftover, bytes("leftover"));
+        try (DataBackupServer again = new DataBackupServer(dataDir.toFile(),
+                new InetSocketAddress(InetAddress.getLoopbackAddress(), 0))) {
+            again.start();
+            assertFalse(Files.exists(leftover));
+        }
+    }
+
+    @Test
     void uploadedAndCommittedContentSurvivesServerCleanup() throws Exception {
         try (ServerTestHarness harness = ServerTestHarness.start()) {
             String token = harness.createToken("upload:laptop", "read:laptop");

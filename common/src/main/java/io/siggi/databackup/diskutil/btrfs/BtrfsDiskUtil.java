@@ -3,13 +3,10 @@ package io.siggi.databackup.diskutil.btrfs;
 import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
-import io.siggi.databackup.diskutil.apfs.ApfsSnapshotSerializer;
 import io.siggi.databackup.util.Util;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 

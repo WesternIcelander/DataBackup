@@ -4,7 +4,6 @@ import io.siggi.databackup.diskutil.DiskUtil;
 import io.siggi.databackup.diskutil.Snapshot;
 import io.siggi.databackup.diskutil.SnapshotException;
 
-import java.io.File;
 import java.util.UUID;
 
 public class NtfsSnapshot implements Snapshot {
