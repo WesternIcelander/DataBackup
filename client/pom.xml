@@ -27,6 +27,20 @@
             <artifactId>DataBackup-common</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
+        <!-- Tests run ServerApi against a real server through the server's ServerTestHarness. -->
+        <dependency>
+            <groupId>io.siggi</groupId>
+            <artifactId>DataBackup-server</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.siggi</groupId>
+            <artifactId>DataBackup-server</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

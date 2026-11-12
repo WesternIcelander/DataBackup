@@ -39,4 +39,22 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <!-- Publishes the test classes (ServerTestHarness) as a test-jar, so the client's tests can use them. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>
