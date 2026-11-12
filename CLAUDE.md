@@ -54,8 +54,12 @@ fake them. Linux and Windows aren't manual: use the test VMs (see below).
   ```
   Commit and push as for a completed step. The `run-plan` workflow counts `- [~]` as done for this run, so it moves
   on instead of stopping.
-- Only the user moves a step from `- [~]` to `- [x]`. If they report problems, add new `- [ ]` fix steps directly
-  under the manual step.
+- A step moves from `- [~]` to `- [x]` only after the user confirms it, or after its check script's log shows every
+  check passed. If anything failed, add new `- [ ]` fix steps directly under the manual step.
+- Manual steps must never block the run. The user may be unavailable for many hours. Never wait for a reply, never
+  return ok=false just because a manual check hasn't been run yet, and never make a later step depend on a manual
+  step's result. If a later step would naturally build on a manual check, build on the automated tests instead and
+  note the dependency in the manual step's note.
 
 ## Test VMs
 
